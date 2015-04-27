@@ -452,6 +452,7 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         idxs = self.surface.mesh.geodetic_min_distance(target, indices=True)
         slon = self.surface.mesh.lons.take(idxs)
         slat = self.surface.mesh.lats.take(idxs)
+        print slon, slat
         rup_distance = geodetic_distance(slon, slat, self.hypocenter.longitude,
                                          self.hypocenter.latitude)
         rup_azimuth = azimuth(self.hypocenter.longitude,

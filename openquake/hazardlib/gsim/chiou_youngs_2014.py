@@ -289,7 +289,7 @@ class ChiouYoungs2014PEER(ChiouYoungs2014):
     """
     #: Only the total standars deviation is defined
     DEFINED_FOR_STANDARD_DEVIATION_TYPES = set([
-        const.StdDev.TOTAL, 
+        const.StdDev.TOTAL,
     ])
     #: The PEER tests requires only PGA
     DEFINED_FOR_INTENSITY_MEASURE_TYPES = set([
