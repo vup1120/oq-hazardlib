@@ -25,12 +25,13 @@ import numpy
 import math
 from openquake.hazardlib.geo.nodalplane import NodalPlane
 from openquake.hazardlib.slots import with_slots
-from openquake.hazardlib.geo.mesh import RectangularMesh, Mesh
+from openquake.hazardlib.geo.mesh import RectangularMesh
 from openquake.hazardlib.geo.point import Point
-from openquake.hazardlib.geo.geodetic import geodetic_distance, azimuth
+from openquake.hazardlib.geo.geodetic import geodetic_distance, distance
 from openquake.hazardlib.near_fault import (get_plane_equation, projection_pp,
                                             directp, average_s_rad,
-                                            isochone_ratio)
+                                            isochone_ratio, get_xyz_from_ll,
+                                            vectors2angle)
 
 
 @with_slots
@@ -448,19 +449,45 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
             rup_azimuth, a numpy array, represents the azimuth between
             hypocenter and the sites.
         """
+        # check if the rupture is multi-patches
+        top_edge = self.surface.get_resampled_top_edge()
+        if len(top_edge) > 2:
+            raise ValueError(
+                'multi-patches rupture calculation has not yet been available')
 
         idxs = self.surface.mesh.geodetic_min_distance(target, indices=True)
-        slon = self.surface.mesh.lons.take(idxs)
-        slat = self.surface.mesh.lats.take(idxs)
-        print slon, slat
-        rup_distance = geodetic_distance(slon, slat, self.hypocenter.longitude,
-                                         self.hypocenter.latitude)
-        rup_azimuth = azimuth(self.hypocenter.longitude,
-                              self.hypocenter.latitude, slon, slat)
+        cls_lon = self.surface.mesh.lons.take(idxs)
+        cls_lat = self.surface.mesh.lats.take(idxs)
+        s_lon = target.lons
+        s_lat = target.lats
+        epi = Point(self.hypocenter.longitude, self.hypocenter.latitude)
+        p_pc = epi.point_at(1., 0., self.surface.get_strike())
+        p_pc_xy = get_xyz_from_ll(p_pc, epi)
+        ph_xy = get_xyz_from_ll(epi, epi)
+        ppc_ph = (numpy.array(p_pc_xy) - numpy.array(ph_xy))
+        rup_azimuth = numpy.empty(len(cls_lon))
+        rup_distance = numpy.empty(len(cls_lon))
+        iloc = 0
 
+        for (lon, lat, slon, slat) in zip(cls_lon, cls_lat, s_lon, s_lat):
+
+            pc_xy = get_xyz_from_ll(Point(lon, lat), epi)
+            pc_ph = (numpy.array(pc_xy) - numpy.array(ph_xy))
+            phi = vectors2angle(ppc_ph, pc_ph)
+            if phi > (math.pi / 2.):
+                phi = math.pi - phi
+            rup_distance[iloc] = numpy.linalg.norm(pc_ph) * numpy.cos(phi)
+            site_xy = get_xyz_from_ll(Point(slon, slat), epi)
+            ps_ph = (numpy.array(site_xy) - numpy.array(ph_xy))
+
+            azimuth = vectors2angle(ppc_ph, ps_ph)
+            if azimuth > (math.pi / 2.):
+                azimuth = math.pi - azimuth
+            rup_azimuth[iloc] = numpy.rad2deg(azimuth)
+            iloc += 1
         return rup_distance, rup_azimuth
 
-    def get_rupture_fraction_dippingfault(self, target):
+    def get_rupture_fraction_dipslip(self, target):
         """
         Obtain the directivity distance parameters for dipping fault defined by
         Somerville et al., 1997, page 205.
@@ -471,33 +498,17 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
             rup_azimuth, a numpy array, represents the azimuth between
             hypocenter and the sites.
         """
+        # check if the rupture is multi-patches
+        top_edge = self.surface.get_resampled_top_edge()
+        if len(top_edge) > 2:
+            raise ValueError(
+                'multi-patches rupture calculation has not yet been available')
 
-        hypo = Point(self.hypocenter.longitude, self.hypocenter.latitude)
-        hypo_patch_idx = self.surface.hypocentre_patch_index(
-            hypo, self.surface.get_resampled_top_edge(),
-            self.surface.mesh.depths[0][0], self.surface.mesh.depths[-1][0],
-            self.surface.get_dip())
-        seg_top, seg_idx = self.surface.get_resampled_top_edge(
-            return_top_edge_index=True)
+        rrup = self.surface.mesh.geodetic_min_distance(target, indices=False)
+        rhypo = self.hypocenter.distance_to_mesh(target)
 
-        slon = self.surface.mesh.lons[:, range(seg_idx[hypo_patch_idx - 1],
-                                      seg_idx[hypo_patch_idx] + 1)]
-        slat = self.surface.mesh.lats[:, range(seg_idx[hypo_patch_idx - 1],
-                                      seg_idx[hypo_patch_idx] + 1)]
-        mesh_point = []
-        for lon, lat in zip(slon.flatten(), slat.flatten()):
-            mesh_point.append(Point(lon, lat))
-
-        seg_mesh = Mesh.from_points_list(mesh_point)
-        rrup = seg_mesh.get_min_distance(target)
-        rup_azimuth = numpy.empty(len(rrup))
-        rhypo = numpy.empty(len(rrup))
-        for iloc, (lon, lat) in enumerate(zip(target.lons, target.lats)):
-            rhypo[iloc] = geodetic_distance(lon, lat,
-                                            self.hypocenter.longitude,
-                                            self.hypocenter.latitude)
-            rup_azimuth[iloc] = azimuth(self.hypocenter.longitude,
-                                        self.hypocenter.latitude, lon, lat)
-        rup_distance = (rrup ** 2 + rhypo ** 2) ** 0.5
+        azimuth = numpy.arcsin(rrup / rhypo)
+        rup_azimuth = numpy.rad2deg(azimuth)
+        rup_distance = (rhypo ** 2 - rrup ** 2) ** 0.5
 
         return rup_distance, rup_azimuth
