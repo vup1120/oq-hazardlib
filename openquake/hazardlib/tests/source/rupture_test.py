@@ -277,21 +277,20 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
         s, phi = rupture.get_rupture_fraction_strikeslip(sites)
         # The value used for this test is computed by hand.
         self.assertTrue(numpy.allclose(
-            s, [23.9959, 23.9959, 23.9959, 31.004, 31.004], atol=0.5))
+            s, [23.9959, 23.9959, 23.9959, 31.004, 31.004], atol=1.0))
         self.assertTrue(numpy.allclose(
-            phi, [16.225, 71.2857, 74.3514, 4.5921, 38.5859], atol=0.5))
+            phi, [16.225, 71.2857, 74.3514, 4.5921, 38.5859], atol=1.0))
 
-    def test_someville_puredipslip(self):
+    def test_someville_dipslip(self):
         rupture = self.make_rupture_somevilletest_dipping(
             ParametricProbabilisticRupture, occurrence_rate=0.01,
             temporal_occurrence_model=PoissonTOM(50))
-        sites = Mesh.from_points_list([Point(10., 45.5), Point(11., 45.5),
-                                      Point(9., 45.5), Point(10., 46.5),
+        sites = Mesh.from_points_list([Point(10., 45.719), Point(11., 45.719),
+                                      Point(9., 45.719), Point(10., 46.5),
                                       Point(11., 46.5)])
         s, phi = rupture.get_rupture_fraction_dipslip(sites)
-
         # The value used for this test is computed by hand.
-        self.assertTrue(numpy.allclose(s, [72.7985, 10., 10., 10., 10.],
-                                       atol=0.5))
-        self.assertTrue(numpy.allclose(phi, [0., 90., 90., 0., 34.427],
-                                       atol=0.5))
+        self.assertTrue(numpy.allclose(
+            s, [10.0, 29.4429, 10., 10., 72.798], atol=1.0))
+        self.assertTrue(numpy.allclose(
+            phi, [0., 65.468, 40.22715, 83.475, 50.], atol=1.0))

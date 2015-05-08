@@ -504,11 +504,64 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
             raise ValueError(
                 'multi-patches rupture calculation has not yet been available')
 
+        hypo = self.hypocenter
         rrup = self.surface.mesh.geodetic_min_distance(target, indices=False)
+        idxs = self.surface.mesh.geodetic_min_distance(target, indices=True)
+        s_lon = target.lons
+        s_lat = target.lats
+        cls_lon = self.surface.mesh.lons.take(idxs)
+        cls_lat = self.surface.mesh.lats.take(idxs)
+        cls_dep = self.surface.mesh.depths.take(idxs)
         rhypo = self.hypocenter.distance_to_mesh(target)
+        rx = self.surface.get_rx_distance(target)
+        rup_azimuth = numpy.empty(len(cls_lon))
+        rup_distance = numpy.empty(len(cls_lon))
 
-        azimuth = numpy.arcsin(rrup / rhypo)
-        rup_azimuth = numpy.rad2deg(azimuth)
-        rup_distance = (rhypo ** 2 - rrup ** 2) ** 0.5
+        for iloc, (lon, lat, dep, slon, slat) in enumerate(zip(cls_lon,
+                                                               cls_lat,
+                                                               cls_dep,
+                                                               s_lon, s_lat)):
+            if rx[iloc] == 0:
+                strike = self.surface.get_strike()
+                azimuth = (strike + 90.0) % 360
+                hdist = self.hypocenter.depth / numpy.tan(numpy.deg2rad(
+                    self.surface.get_dip()))
+                trace_top = hypo.point_at(
+                    hdist, -self.hypocenter.depth, 360 - azimuth)
+                rup_distance[iloc] = distance(
+                    self.hypocenter.longitude, self.hypocenter.latitude,
+                    self.hypocenter.depth, trace_top.longitude,
+                    trace_top.latitude, trace_top.depth)
 
-        return rup_distance, rup_azimuth
+                rup_azimuth[iloc] = numpy.arcsin(
+                    (rhypo[iloc] ** 2 - rup_distance[iloc] ** 2)
+                    ** 0.5 / rhypo[iloc])
+
+            if rx[iloc] > 0:
+                rup_azimuth[iloc] = numpy.arcsin(rrup[iloc] / rhypo[iloc])
+                rup_distance[iloc] = (
+                    rhypo[iloc] ** 2 - rrup[iloc] ** 2) ** 0.5
+
+            if rx[iloc] < 0:
+                strike = self.surface.get_strike()
+                azimuth = (strike + 90.0) % 360
+
+                cls_point = Point(lon, lat, dep)
+                hdist = dep / numpy.tan(numpy.deg2rad(self.surface.get_dip()))
+                trace_top = cls_point.point_at(hdist, -dep, 360 - azimuth)
+                pc_xy = get_xyz_from_ll(cls_point, hypo)
+                site_xy = get_xyz_from_ll(Point(slon, slat), hypo)
+                trace_top_xy = get_xyz_from_ll(trace_top, hypo)
+                site_cls = (numpy.array(site_xy) - numpy.array(pc_xy))
+                top_site = (numpy.array(site_xy) - numpy.array(trace_top_xy))
+                angle = numpy.rad2deg(vectors2angle(site_cls, top_site))
+                rup_azimuth[iloc] = numpy.arcsin(
+                    rrup[iloc] / rhypo[iloc] * numpy.sin(
+                        numpy.pi - numpy.deg2rad(self.surface.get_dip())
+                        + numpy.deg2rad(angle)))
+                rup_distance[iloc] = numpy.sin(
+                    numpy.deg2rad(
+                        self.surface.get_dip()) - rup_azimuth[iloc] + angle) \
+                    / numpy.sin(rup_azimuth[iloc]) * rrup[iloc]
+
+        return rup_distance, numpy.rad2deg(rup_azimuth)
