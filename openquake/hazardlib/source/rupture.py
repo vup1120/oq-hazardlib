@@ -387,7 +387,7 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         :param target_site:
             A mesh object representing the location of the target sites.
         :param buf:
-            A float vaule presents  the buffer distance in km to extend the
+            A float vaule presents the buffer distance in km to extend the
             mesh borders to.
         :param delta:
             A float vaule presents the desired distance between two adjacent
@@ -442,16 +442,22 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
 
         return cdpp
 
-    def get_rupture_fraction_strikeslip(self, target):
+    def get_rupture_fraction_strikeslip(self, target, angle=False):
         """
         Obtain the directivity distance parameters for strike-slip defined by
         Somerville et al., 1997, page 205.
 
+        :param target:
+            A mesh object representing the location of the target sites.
+        :param angle:
+            If ``True`` (by default), the rup_azimuth is calculated. If this
+            is set to ``False``, the rup_distance is calculated.
         :returns:
             rup_distance, a numpy array, represents the rupture fraction
             distance to the target site.
-            rup_azimuth, a numpy array, represents the azimuth between
-            hypocenter and the sites.
+            rup_azimuth, a numpy array, represents the angle between the
+            rupture direction and the path to the site with respect to the
+            rupture (measured in degrees herein)
         """
         # check if the rupture is multi-patches
         top_edge = self.surface.get_resampled_top_edge()
@@ -489,18 +495,27 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
                 azimuth = math.pi - azimuth
             rup_azimuth[iloc] = numpy.rad2deg(azimuth)
             iloc += 1
-        return rup_distance, rup_azimuth
+        if angle:
+            return rup_azimuth
+        else:
+            return rup_distance
 
-    def get_rupture_fraction_dipslip(self, target):
+    def get_rupture_fraction_dipslip(self, target, angle=False):
         """
         Obtain the directivity distance parameters for dipping fault defined by
         Somerville et al., 1997, page 205.
 
+        :param target:
+            A mesh object representing the location of the target sites.
+        :param angle:
+            If ``True`` (by default), the rup_azimuth is calculated. If this
+            is set to ``False``, the rup_distance is calculated.
         :returns:
             rup_distance, a numpy array, represents the rupture fraction
             distance to the target site.
-            rup_azimuth, a numpy array, represents the azimuth between
-            hypocenter and the sites.
+            rup_azimuth, a numpy array, represents the angle between the
+            rupture direction and the path to the site with respect to the
+            rupture (measured in degrees herein)
         """
         # check if the rupture is multi-patches
         top_edge = self.surface.get_resampled_top_edge()
@@ -567,5 +582,7 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
                     numpy.deg2rad(
                         self.surface.get_dip()) - rup_azimuth[iloc] + angle) \
                     / numpy.sin(rup_azimuth[iloc]) * rrup[iloc]
-
-        return rup_distance, numpy.rad2deg(rup_azimuth)
+        if angle:
+            return numpy.rad2deg(rup_azimuth)
+        else:
+            return rup_distance

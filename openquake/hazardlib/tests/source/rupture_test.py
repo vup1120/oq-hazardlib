@@ -306,7 +306,8 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
         sites = Mesh.from_points_list([Point(10., 45.5), Point(11., 45.5),
                                       Point(9., 45.5), Point(10., 46.5),
                                       Point(11., 46.5)])
-        s, phi = rupture.get_rupture_fraction_strikeslip(sites)
+        s = rupture.get_rupture_fraction_strikeslip(sites, angle=False)
+        phi = rupture.get_rupture_fraction_strikeslip(sites, angle=True)
 
         # The value used for this test is computed by hand.
         self.assertTrue(numpy.allclose(s, [0., 0., 0., 55.597, 55.597],
@@ -347,7 +348,8 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
         sites = Mesh.from_points_list([Point(10., 45.5), Point(11., 45.5),
                                       Point(9., 45.5), Point(10., 46.5),
                                       Point(11., 46.5)])
-        s, phi = rupture.get_rupture_fraction_strikeslip(sites)
+        s = rupture.get_rupture_fraction_strikeslip(sites, angle=False)
+        phi = rupture.get_rupture_fraction_strikeslip(sites, angle=True)
         # The value used for this test is computed by hand.
         self.assertTrue(numpy.allclose(
             s, [23.9959, 23.9959, 23.9959, 31.004, 31.004], atol=1.0))
@@ -361,7 +363,8 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
         sites = Mesh.from_points_list([Point(10., 45.719), Point(11., 45.719),
                                       Point(9., 45.719), Point(10., 46.5),
                                       Point(11., 46.5)])
-        s, phi = rupture.get_rupture_fraction_dipslip(sites)
+        s = rupture.get_rupture_fraction_dipslip(sites, angle=False)
+        phi = rupture.get_rupture_fraction_dipslip(sites, angle=True)
         # The value used for this test is computed by hand.
         self.assertTrue(numpy.allclose(
             s, [10.0, 29.4429, 10., 10., 72.798], atol=1.0))
