@@ -573,11 +573,11 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
                 trace_top_xy = get_xyz_from_ll(trace_top, hypo)
                 site_cls = (numpy.array(site_xy) - numpy.array(pc_xy))
                 top_site = (numpy.array(site_xy) - numpy.array(trace_top_xy))
-                angle = numpy.rad2deg(vectors2angle(site_cls, top_site))
+                phi = numpy.rad2deg(vectors2angle(site_cls, top_site))
                 rup_azimuth[iloc] = numpy.arcsin(
                     rrup[iloc] / rhypo[iloc] * numpy.sin(
                         numpy.pi - numpy.deg2rad(self.surface.get_dip())
-                        + numpy.deg2rad(angle)))
+                        + numpy.deg2rad(phi)))
                 rup_distance[iloc] = numpy.sin(
                     numpy.deg2rad(
                         self.surface.get_dip()) - rup_azimuth[iloc] + angle) \
