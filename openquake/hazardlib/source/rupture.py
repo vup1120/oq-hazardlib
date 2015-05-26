@@ -471,26 +471,48 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         s_lon = target.lons
         s_lat = target.lats
         epi = Point(self.hypocenter.longitude, self.hypocenter.latitude)
+
+        # To calculate the effect of directivity, we calculate the rupture
+        # fraction length from epicentre(along strike direction as defined in
+        # Somerville et al., 1997) to the site, and the rupture angel which
+        # is the angle between the fault strike and the path to the site with
+        # respect to the rupture. We calculate first the distance between the
+        # closest point(site to the rupture) projected onto surface and
+        # epicentre. Then, we project the distance segment onto the strike
+        # diretion(assumed the rupture direction) to obtain the rupture
+        # fraction effective distance to the site.
+
+        # Obtain the strike direction vector(in Cartesian coordinate system)
+        # p_pc is one point along strike direction passing through epicentre
+        # p_pc_xy is p_pc in Cartesian coordinate system
+        # pe_xy is epicentre in Cartesian coordinate system
+        # ppc_pe is the vector from epicentre to p_pc
         p_pc = epi.point_at(1., 0., self.surface.get_strike())
         p_pc_xy = get_xyz_from_ll(p_pc, epi)
-        ph_xy = get_xyz_from_ll(epi, epi)
-        ppc_ph = (numpy.array(p_pc_xy) - numpy.array(ph_xy))
+        pe_xy = get_xyz_from_ll(epi, epi)
+        ppc_pe = (numpy.array(p_pc_xy) - numpy.array(pe_xy))
+
         rup_azimuth = numpy.empty(len(cls_lon))
         rup_distance = numpy.empty(len(cls_lon))
         iloc = 0
 
         for (lon, lat, slon, slat) in zip(cls_lon, cls_lat, s_lon, s_lat):
 
+            # Obtain the vector from closest point to epicentre.
+            # pc_xy is the closest point in Cartesian coordinate system
+            # pc_pe is the vector from cloest point to epicentre
             pc_xy = get_xyz_from_ll(Point(lon, lat), epi)
-            pc_ph = (numpy.array(pc_xy) - numpy.array(ph_xy))
-            phi = vectors2angle(ppc_ph, pc_ph)
+            pc_pe = (numpy.array(pc_xy) - numpy.array(pe_xy))
+
+            phi = vectors2angle(ppc_pe, pc_pe)
             if phi > (math.pi / 2.):
                 phi = math.pi - phi
-            rup_distance[iloc] = numpy.linalg.norm(pc_ph) * numpy.cos(phi)
-            site_xy = get_xyz_from_ll(Point(slon, slat), epi)
-            ps_ph = (numpy.array(site_xy) - numpy.array(ph_xy))
 
-            azimuth = vectors2angle(ppc_ph, ps_ph)
+            rup_distance[iloc] = numpy.linalg.norm(pc_pe) * numpy.cos(phi)
+            site_xy = get_xyz_from_ll(Point(slon, slat), epi)
+            ps_pe = (numpy.array(site_xy) - numpy.array(pe_xy))
+
+            azimuth = vectors2angle(ppc_pe, ps_pe)
             if azimuth > (math.pi / 2.):
                 azimuth = math.pi - azimuth
             rup_azimuth[iloc] = numpy.rad2deg(azimuth)
@@ -521,25 +543,31 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         top_edge = self.surface.get_resampled_top_edge()
         if len(top_edge) > 2:
             raise ValueError(
-                'multi-patches rupture calculation has not yet been available')
+                'multi-segment rupture calculation has not yet been available')
 
         hypo = self.hypocenter
         rrup = self.surface.mesh.geodetic_min_distance(target, indices=False)
         idxs = self.surface.mesh.geodetic_min_distance(target, indices=True)
         s_lon = target.lons
         s_lat = target.lats
+
+        # The closest points to the rupture from the sties
         cls_lon = self.surface.mesh.lons.take(idxs)
         cls_lat = self.surface.mesh.lats.take(idxs)
         cls_dep = self.surface.mesh.depths.take(idxs)
+
         rhypo = self.hypocenter.distance_to_mesh(target)
         rx = self.surface.get_rx_distance(target)
         rup_azimuth = numpy.empty(len(cls_lon))
         rup_distance = numpy.empty(len(cls_lon))
-
         for iloc, (lon, lat, dep, slon, slat) in enumerate(zip(cls_lon,
                                                                cls_lat,
                                                                cls_dep,
                                                                s_lon, s_lat)):
+            # The calculation varies for different site to rupture geometries
+            # The priciple is to get the rupture distance by applying the sine
+            # law and the cosine rule when Rrup, dip angle, and Rhypo are
+            # known.
             if rx[iloc] == 0:
                 strike = self.surface.get_strike()
                 azimuth = (strike + 90.0) % 360
