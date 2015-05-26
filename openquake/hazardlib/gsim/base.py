@@ -485,6 +485,8 @@ class GroundShakingIntensityModel(object):
                 dist = rupture.hypocenter.distance_to_mesh(
                     site_collection.mesh, with_depths=False
                 )
+            elif param == 'rcdpp':
+                dist = rupture.get_cdppvalue(site_collection.mesh)
             elif param == 'rs':
                 dist = rupture.get_rupture_fraction_strikeslip(
                     site_collection.mesh, angle=False)

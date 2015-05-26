@@ -443,7 +443,8 @@ class BaseQuadrilateralSurface(BaseSurface):
             Number representing the maximum deviation (in degrees) admitted
             without the creation of a new segment
         :returns:
-            line_top_edge, a :class:`~openquake.hazardlib.geo.line.Line`
+            line_top_edge, an instance
+            :class:`~openquake.hazardlib.geo.line.Line`
             representing the rupture surface's top edge.
             top_edge_index, a numpy array of floats represents the indices of
             the top edge on the rupture mesh(only be return when

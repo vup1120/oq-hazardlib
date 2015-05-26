@@ -387,13 +387,13 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         :param target_site:
             A mesh object representing the location of the target sites.
         :param buf:
-            A float vaule presents the buffer distance in km to extend the
+            A float value presents the buffer distance in km to extend the
             mesh borders to.
         :param delta:
-            A float vaule presents the desired distance between two adjacent
+            A float value presents the desired distance between two adjacent
             points in mesh
         :param space:
-            A float vaule presents the tolerance for the same distance of the
+            A float value presents the tolerance for the same distance of the
             sites (default 2 km)
         :returns:
             A float value presents the centreed directivity predication value
@@ -459,11 +459,11 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
             rupture direction and the path to the site with respect to the
             rupture (measured in degrees herein)
         """
-        # check if the rupture is multi-patches
+        # check if the rupture is multi-segment
         top_edge = self.surface.get_resampled_top_edge()
         if len(top_edge) > 2:
             raise ValueError(
-                'multi-patches rupture calculation has not yet been available')
+                'multi-segment rupture calculation has not yet been available')
 
         idxs = self.surface.mesh.geodetic_min_distance(target, indices=True)
         cls_lon = self.surface.mesh.lons.take(idxs)
