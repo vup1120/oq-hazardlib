@@ -23,6 +23,7 @@ Built-in GSIMs
     atkinson_boore_1995
     atkinson_boore_2003
     atkinson_boore_2006
+    atkinson_macias_2009
     atkinson_2015
     berge_thierry_2003
     bindi_2011
@@ -54,6 +55,7 @@ Built-in GSIMs
     fukushima_tanaka_1990
     garcia_2005
     geomatrix_1993
+    ghofrani_atkinson_2014
     idriss_2014
     lin_lee_2008
     lin_2009
