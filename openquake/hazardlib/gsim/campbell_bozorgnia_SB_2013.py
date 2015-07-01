@@ -98,7 +98,7 @@ class CampbellBozorgniaSB2013(GMPE):
                 self._compute_hanging_wall_term(C, rup, dists) +
                 self._compute_shallow_site_response(C, sites, pga1100) +
                 self._compute_basin_response_term(C, sites.z2pt5) +
-                self._compute_pulse_response_term
+                self._compute_pulse_response_term(C, rup.mag, imt, rup, dists)
                 )
 
         stddevs = self._get_stddevs(C)
@@ -286,16 +286,17 @@ class CampbellBozorgniaSB2013(GMPE):
 
     def _compute_pulse_response_term(self, C, mag, imt, rup, dists):
         """
-        Returns the basin response term (equation 5.20, page 119)
+        Returns the pulse response term (equation 5.20, page 119)
         """
         mean_lntp = -6.207 + 1.075 * mag
         sigma_lntp = 0.61
         d = 2 * sigma_lntp ** 2 * C['b1']
-        c = np.ln(imt.period) - C['b2']
+        print d
+        c = np.log(imt.period) - C['b2']
         alpha_pulse = ((d * c ** 2 - mean_lntp ** 2) / (d - 1)) - (
             (d * c - mean_lntp) / (d - 1)) ** 2
-        pulse_amp = C['b0'] * np.exp(-(
-            (1 - d) * alpha_pulse / 2 / sigma_lntp ** 2)) / (d - 1) ** 0.5
+        exp_log = -1 * (1 - d) * alpha_pulse / (2 * sigma_lntp ** 2)
+        pulse_amp = C['b0'] * np.exp(exp_log) / (d - 1) ** 0.5
 
         prob_pulse = np.zeros_like(rup.rake, dtype=float)
         frv, fnm = self._get_fault_type_dummy_variables(rup.rake)
