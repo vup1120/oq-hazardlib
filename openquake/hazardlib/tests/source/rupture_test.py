@@ -50,6 +50,7 @@ def make_rupture(rupture_class, **kwargs):
 
 
 class RuptureCreationTestCase(unittest.TestCase):
+
     def assert_failed_creation(self, rupture_class, exc, msg, **kwargs):
         with self.assertRaises(exc) as ae:
             make_rupture(rupture_class, **kwargs)
@@ -92,6 +93,7 @@ class RuptureCreationTestCase(unittest.TestCase):
 
 
 class ParametricProbabilisticRuptureTestCase(unittest.TestCase):
+
     def test_get_probability_one_or_more(self):
         rupture = make_rupture(ParametricProbabilisticRupture,
                                occurrence_rate=1e-2,
@@ -207,6 +209,7 @@ class Cdppvalue(unittest.TestCase):
 
 
 class NonParametricProbabilisticRuptureTestCase(unittest.TestCase):
+
     def assert_failed_creation(self, rupture_class, exc, msg, **kwargs):
         with self.assertRaises(exc) as ae:
             make_rupture(rupture_class, **kwargs)
@@ -273,7 +276,9 @@ class NonParametricProbabilisticRuptureTestCase(unittest.TestCase):
         self.assertAlmostEqual(p_occs_1, 0.2, places=2)
         self.assertAlmostEqual(p_occs_2, 0.1, places=2)
 
+
 class SomevilleRuptureParameterTest(unittest.TestCase):
+
     def make_rupture_somevilletest_non_dipping(self, rupture_class, **kwargs):
         # Create the rupture surface.
         upper_seismogenic_depth = 0.
@@ -305,8 +310,8 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
             ParametricProbabilisticRupture, occurrence_rate=0.01,
             temporal_occurrence_model=PoissonTOM(50))
         sites = Mesh.from_points_list([Point(10., 45.5), Point(11., 45.5),
-                                      Point(9., 45.5), Point(10., 46.5),
-                                      Point(11., 46.5)])
+                                       Point(9., 45.5), Point(10., 46.5),
+                                       Point(11., 46.5)])
         s = rupture.get_rupture_fraction_strikeslip(sites, angle=False)
         phi = rupture.get_rupture_fraction_strikeslip(sites, angle=True)
 
@@ -347,8 +352,8 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
             ParametricProbabilisticRupture, occurrence_rate=0.01,
             temporal_occurrence_model=PoissonTOM(50))
         sites = Mesh.from_points_list([Point(10., 45.5), Point(11., 45.5),
-                                      Point(9., 45.5), Point(10., 46.5),
-                                      Point(11., 46.5)])
+                                       Point(9., 45.5), Point(10., 46.5),
+                                       Point(11., 46.5)])
         s = rupture.get_rupture_fraction_strikeslip(sites, angle=False)
         phi = rupture.get_rupture_fraction_strikeslip(sites, angle=True)
         # The value used for this test is computed by hand.
@@ -362,8 +367,8 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
             ParametricProbabilisticRupture, occurrence_rate=0.01,
             temporal_occurrence_model=PoissonTOM(50))
         sites = Mesh.from_points_list([Point(10., 45.719), Point(11., 45.719),
-                                      Point(9., 45.719), Point(10., 46.5),
-                                      Point(11., 46.5)])
+                                       Point(9., 45.719), Point(10., 46.5),
+                                       Point(11., 46.5)])
         s = rupture.get_rupture_fraction_dipslip(sites, angle=False)
         phi = rupture.get_rupture_fraction_dipslip(sites, angle=True)
         # The value used for this test is computed by hand.

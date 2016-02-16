@@ -378,6 +378,7 @@ class RectangularMesh(Mesh):
     of points but rather a sort of table of points, where index of the point
     in a mesh is related to it's position with respect to neighbouring points.
     """
+
     def __init__(self, lons, lats, depths=None):
         super(RectangularMesh, self).__init__(lons, lats, depths)
         assert lons.ndim == 2
@@ -393,14 +394,14 @@ class RectangularMesh(Mesh):
             objects.
         """
         assert points is not None and len(points) > 0 and len(points[0]) > 0, \
-               'list of at least one non-empty list of points is required'
+            'list of at least one non-empty list of points is required'
         lons = numpy.zeros((len(points), len(points[0])), dtype=float)
         lats = lons.copy()
         depths = lons.copy()
         num_cols = len(points[0])
         for i, row in enumerate(points):
             assert len(row) == num_cols, \
-                   'lists of points are not of uniform length'
+                'lists of points are not of uniform length'
             for j, point in enumerate(row):
                 lons[i][j] = point.longitude
                 lats[i][j] = point.latitude
@@ -496,8 +497,8 @@ class RectangularMesh(Mesh):
             else:
                 # even number of columns, need to take two middle
                 # points on the middle row
-                lon1, lon2 = self.lons[mid_row][mid_col - 1 : mid_col + 1]
-                lat1, lat2 = self.lats[mid_row][mid_col - 1 : mid_col + 1]
+                lon1, lon2 = self.lons[mid_row][mid_col - 1: mid_col + 1]
+                lat1, lat2 = self.lats[mid_row][mid_col - 1: mid_col + 1]
                 if self.depths is not None:
                     depth1 = self.depths[mid_row][mid_col - 1]
                     depth2 = self.depths[mid_row][mid_col]
@@ -505,8 +506,8 @@ class RectangularMesh(Mesh):
             # there are even number of rows. take the row just above
             # and the one just below the middle and find middle point
             # of each
-            submesh1 = self[mid_row - 1 : mid_row]
-            submesh2 = self[mid_row : mid_row + 1]
+            submesh1 = self[mid_row - 1: mid_row]
+            submesh2 = self[mid_row: mid_row + 1]
             p1, p2 = submesh1.get_middle_point(), submesh2.get_middle_point()
             lon1, lat1, depth1 = p1.longitude, p1.latitude, p1.depth
             lon2, lat2, depth2 = p2.longitude, p2.latitude, p2.depth

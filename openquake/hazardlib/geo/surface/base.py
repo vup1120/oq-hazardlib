@@ -470,7 +470,7 @@ class BaseQuadrilateralSurface(with_metaclass(abc.ABCMeta, BaseSurface)):
 
                 top_edge_index.append(i)
                 top_edge.append(Point(mesh.lons[0][-1],
-                                mesh.lats[0][-1], mesh.depths[0][-1]))
+                                      mesh.lats[0][-1], mesh.depths[0][-1]))
                 line_top_edge = Line(top_edge)
 
         top_edge.append(Point(mesh.lons[0][-1],

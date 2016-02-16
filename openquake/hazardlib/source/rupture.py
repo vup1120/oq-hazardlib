@@ -158,6 +158,7 @@ class NonParametricProbabilisticRupture(BaseProbabilisticRupture):
         If number of ruptures in ``pmf`` do not start from 0, are not defined
         in increasing order, and if they are not defined with unit step
     """
+
     def __init__(self, mag, rake, tectonic_region_type, hypocenter, surface,
                  source_typology, pmf, rupture_slip_direction=None):
         x = numpy.array([x for (y, x) in pmf.data])
@@ -424,7 +425,7 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         cdpp = numpy.empty(len(target_lons))
 
         for iloc, (target_lon, target_lat) in enumerate(zip(target_lons,
-                                                        target_lats)):
+                                                            target_lats)):
 
             cdpp_sites_lats = mesh.lats[(mesh_rup <= target_rup[iloc] + space)
                                         & (mesh_rup >= target_rup[iloc]

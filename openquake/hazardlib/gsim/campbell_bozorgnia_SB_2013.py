@@ -249,7 +249,7 @@ class CampbellBozorgniaSB2013(GMPE):
         if np.any(idx):
             pga_scale = np.log(pga1100[idx] +
                                (C['c'] * ((sites.vs30[idx] / C['k1']) **
-                                C['n']))) - np.log(pga1100[idx] + C['c'])
+                                          C['n']))) - np.log(pga1100[idx] + C['c'])
             fsite[idx] = C['c10'] * np.log(sites.vs30[idx] / C['k1']) + \
                 (C['k2'] * pga_scale)
         # Any very hard rock sites are rendered to the constant amplification
