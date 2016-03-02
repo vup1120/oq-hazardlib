@@ -133,17 +133,13 @@ def get_distances(rupture, mesh, param='rjb'):
     elif param == 'rcdpp':
         dist = rupture.get_cdppvalue(mesh)
     elif param == 'rs':
-        dist = rupture.get_rupture_fraction_strikeslip(
-            site_collection.mesh, angle=False)
+        dist = rupture.get_rupture_fraction_strikeslip(mesh, angle=False)
     elif param == 'rtheta':
-        dist = rupture.get_rupture_fraction_strikeslip(
-            site_collection.mesh, angle=True)
+        dist = rupture.get_rupture_fraction_strikeslip(mesh, angle=True)
     elif param == 'rd':
-        dist = rupture.get_rupture_fraction_dipslip(
-            site_collection.mesh, angle=False)
+        dist = rupture.get_rupture_fraction_dipslip(mesh, angle=False)
     elif param == 'rphi':
-        dist = rupture.get_rupture_fraction_dipslip(
-            site_collection.mesh, angle=True)
+        dist = rupture.get_rupture_fraction_dipslip(mesh, angle=True)
     else:
         raise ValueError('Unknown distance measure %r' % param)
     return dist
@@ -850,7 +846,7 @@ class DistancesContext(BaseContext):
     in a result context object.
     """
     _slots_ = ('rrup', 'rx', 'rjb', 'rhypo', 'repi', 'ry0', 'rcdpp',
-               'azimuth', 'hanging_wall', 'rs', 'rtheta', 'rd', 'rphi'))
+               'azimuth', 'hanging_wall', 'rs', 'rtheta', 'rd', 'rphi')
 
 
 class RuptureContext(BaseContext):
@@ -865,10 +861,8 @@ class RuptureContext(BaseContext):
     Only those required parameters are made available in a result context
     object.
     """
-    _slots_ = (
-        'mag', 'strike', 'dip', 'rake', 'ztor', 'hypo_lon', 'hypo_lat',
-        'hypo_depth', 'width', 'hypo_loc'
-    )
+    _slots_ = ('mag', 'strike', 'dip', 'rake', 'ztor', 'hypo_lon', 'hypo_lat',
+               'hypo_depth', 'width', 'hypo_loc')
 
 
 class CoeffsTable(object):

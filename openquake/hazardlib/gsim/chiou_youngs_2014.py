@@ -106,6 +106,8 @@ class ChiouYoungs2014(GMPE):
         # to find the exact mean value.
         eta = epsilon = 0.
 
+
+
         ln_y = (
             # first line of eq. 12
             ln_y_ref + eta
@@ -120,7 +122,6 @@ class ChiouYoungs2014(GMPE):
             # fifth line
             + epsilon
         )
-
         return ln_y
 
     def _get_stddevs(self, sites, rup, C, stddev_types, ln_y_ref, exp1, exp2):
@@ -186,6 +187,12 @@ class ChiouYoungs2014(GMPE):
         centered_ztor = self._get_centered_ztor(rup, Frv)
         #
 
+        dist_taper =  np.fmax(1 - (np.fmax(dists.rrup - 40,
+                                np.zeros_like(dists)) / 30.),
+                                np.zeros_like(dists))
+
+        dist_taper = dist_taper.astype(np.float64)
+
         ln_y_ref = (
             # first part of eq. 11
             C['c1']
@@ -208,9 +215,7 @@ class ChiouYoungs2014(GMPE):
             + (C['cg1'] + C['cg2'] / (np.cosh(max(rup.mag - C['cg3'], 0))))
             * dists.rrup
             # fifth part
-            + C['c8'] * np.fmax(1 - (np.fmax(dists.rrup - 40,
-                                np.zeros_like(dists)) / 30.),
-                                np.zeros_like(dists))[0]
+            + C['c8'] * dist_taper
             * min(max(rup.mag - 5.5, 0) / 0.8, 1.0)
             * np.exp(-1 * C['c8a'] * (rup.mag - C['c8b']) ** 2) * centered_dpp
             # sixth part
@@ -219,7 +224,6 @@ class ChiouYoungs2014(GMPE):
             * (1 - np.sqrt(dists.rjb ** 2 + rup.ztor ** 2)
                / (dists.rrup + 1.0))
         )
-
         return ln_y_ref
 
     def _get_centered_z1pt0(self, sites):
@@ -249,6 +253,7 @@ class ChiouYoungs2014(GMPE):
 
             mean_ztor = max(2.673 - 1.136 * max(rup.mag - 4.970, 0.0), 0.) ** 2
             centered_ztor = rup.ztor - mean_ztor
+
 
         return centered_ztor
 

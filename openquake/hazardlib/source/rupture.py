@@ -506,14 +506,17 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
             # pc_xy is the closest point in Cartesian coordinate system
             # pc_pe is the vector from cloest point to epicentre
             pc_xy = get_xyz_from_ll(Point(lon, lat), epi)
+ 
+
             pc_pe = (numpy.array(pc_xy) - numpy.array(pe_xy))
 
-            phi = vectors2angle(ppc_pe, pc_pe)
+            phi = vectors2angle(numpy.array(ppc_pe), pc_pe)
             if phi > (math.pi / 2.):
                 phi = math.pi - phi
 
             rup_distance[iloc] = numpy.linalg.norm(pc_pe) * numpy.cos(phi)
             site_xy = get_xyz_from_ll(Point(slon, slat), epi)
+
             ps_pe = (numpy.array(site_xy) - numpy.array(pe_xy))
 
             azimuth = vectors2angle(ppc_pe, ps_pe)

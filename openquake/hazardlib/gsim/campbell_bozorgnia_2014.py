@@ -119,6 +119,7 @@ class CampbellBozorgnia2014(GMPE):
                                     sites,
                                     pga1100,
                                     stddev_types)
+        print(mean, stddevs)
         return mean, stddevs
 
     def get_mean_values(self, C, sites, rup, dists, a1100):
