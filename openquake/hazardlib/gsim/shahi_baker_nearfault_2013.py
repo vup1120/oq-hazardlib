@@ -14,8 +14,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-Module exports :class:`CampbellBozorgniaSB2013`, and
-:class:'CampbellBozorgniaSB2013Arbitrary'
+Module exports :class:`ShahiBakerNearFault2013`
 """
 from __future__ import division
 
@@ -26,7 +25,7 @@ from openquake.hazardlib import const
 from openquake.hazardlib.imt import SA
 
 
-class CampbellBozorgniaSB2013(GMPE):
+class ShahiBakerNearFault2013(GMPE):
     """
     Implements GMPE developed by Shrey Kumar Shahi published as "A
     probabilistic framework to include the effects of near-fault

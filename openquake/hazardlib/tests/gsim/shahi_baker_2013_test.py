@@ -16,8 +16,8 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with OpenQuake. If not, see <http://www.gnu.org/licenses/>.
 
-from openquake.hazardlib.gsim.campbell_bozorgnia_SB_2013 import (
-    CampbellBozorgniaSB2013)
+from openquake.hazardlib.gsim.shahi_baker_2013 import (
+    ShahiBaker2013)
 
 from openquake.hazardlib.tests.gsim.utils import BaseGSIMTestCase
 
@@ -25,17 +25,17 @@ from openquake.hazardlib.tests.gsim.utils import BaseGSIMTestCase
 # since the reference code is not available from the author
 
 
-class CampbellBozorgniaSB2013TestCase(BaseGSIMTestCase):
-    GSIM_CLASS = CampbellBozorgniaSB2013
+class ShahiBaker2013TestCase(BaseGSIMTestCase):
+    GSIM_CLASS = ShahiBaker2013
 
     def test_mean_strikeslip_faulting(self):
-        self.check('CBSB13/CBSB13_SS_MEAN.csv', max_discrep_percentage=0.1)
+        self.check('CBR13/CBR13_SS_MEAN.csv', max_discrep_percentage=0.1)
 
     def test_mean_reverse_faulting(self):
-        self.check('CBSB13/CBSB13_RV_MEAN.csv', max_discrep_percentage=0.1)
+        self.check('CBR13/CBR13_RV_MEAN.csv', max_discrep_percentage=0.1)
 
     def test_std_total_reverse(self):
-        self.check('CBSB13/CBSB13_RV_STD_TOTAL.csv', max_discrep_percentage=0.1)
+        self.check('CBR13/CBR13_RV_STD_TOTAL.csv', max_discrep_percentage=0.1)
 
     def test_std_total_strikeslip(self):
-        self.check('CBSB13/CBSB13_SS_STD_TOTAL.csv', max_discrep_percentage=0.1)
+        self.check('CBR13/CBR13_SS_STD_TOTAL.csv', max_discrep_percentage=0.1)
