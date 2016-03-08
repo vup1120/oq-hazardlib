@@ -449,8 +449,8 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
 
     def get_rupture_fraction_strikeslip(self, target, angle=False):
         """
-        Obtain the directivity distance parameters for strike-slip defined by
-        Somerville et al., 1997, page 205.
+        Obtain the distance parameters needed to predict directivity for
+        strike-slip event defined by Somerville et al., 1997, page 205.
         :param target:
             A mesh object representing the location of the target sites.
         :param angle:
@@ -506,8 +506,6 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
             # pc_xy is the closest point in Cartesian coordinate system
             # pc_pe is the vector from cloest point to epicentre
             pc_xy = get_xyz_from_ll(Point(lon, lat), epi)
- 
-
             pc_pe = (numpy.array(pc_xy) - numpy.array(pe_xy))
 
             phi = vectors2angle(numpy.array(ppc_pe), pc_pe)
@@ -531,8 +529,8 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
 
     def get_rupture_fraction_dipslip(self, target, angle=False):
         """
-        Obtain the directivity distance parameters for dipping fault defined by
-        Somerville et al., 1997, page 205.
+        Obtain the distance parameters needed to predict directivity for
+        non-strike-slip event defined by Somerville et al., 1997, page 205.
         :param target:
             A mesh object representing the location of the target sites.
         :param angle:
