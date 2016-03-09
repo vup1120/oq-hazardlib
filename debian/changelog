@@ -1,3 +1,14 @@
+  [Yen-Shin Chen]
+  * Make _geodetic_min_distance method accessible in order to be called in
+    get_rupture_fraction_strikeslip, and get_rupture_fraction_dipslip method
+  * Adds 'rs', 'rtheta', 'rd', 'rphi' slots to DistanceContext object
+  * Implemented ShahiBaker2013 GMPE
+  * Implemented ShahiBakerNearFault2013 GMPE
+  * Implemented get_rupture_fraction_strikeslip method to obtain 'rs' and
+    'rtheta' distances.
+  * Implemented get_rupture_fraction_dipslip method to obtain 'rd' and
+    'rphi' distances.
+
   [Michele Simionato]
   * Added to the Monitor the ability to send commands
 
