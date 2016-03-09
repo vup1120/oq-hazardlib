@@ -532,6 +532,7 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         """
         Obtain the distance parameters needed to predict directivity for
         non-strike-slip event defined by Somerville et al., 1997, page 205.
+
         :param target:
             A mesh object representing the location of the target sites.
         :param angle:
