@@ -144,3 +144,49 @@ class JB2009CorrelationModel(BaseCorrelationModel):
         See :meth:`BaseCorrelationModel.get_lower_triangle_correlation_matrix`.
         """
         return numpy.linalg.cholesky(self._get_correlation_matrix(sites, imt))
+
+
+class JB2009PGVCorrelationModel(JB2009CorrelationModel):
+    """
+    "Correlation model for spatially distributed ground-motion intensities"
+    by Nirmal Jayaram and Jack W. Baker. Published in Earthquake Engineering
+    and Structural Dynamics 2009; 38, pages 1687-1708.
+
+    :param vs30_clustering:
+        Boolean value to indicate whether "Case 1" or "Case 2" from page 1700
+        should be applied. ``True`` value means that Vs 30 values show or are
+        expected to show clustering ("Case 2"), ``False`` means otherwise.
+    """
+    def _get_correlation_model(self, distances, imt):
+        """
+        Returns the correlation model for a set of distances, given the
+        appropriate period
+
+        :param numpy.ndarray distances:
+            Distance matrix
+
+        :param float period:
+            Period of spectral acceleration
+        """
+        if isinstance(imt, SA):
+            period = imt.period
+        else:
+            assert isinstance(imt, PGA), imt
+            period = 0
+
+        # formulae are from page 1700
+        if sinstance(imt, PGV):
+            return numpy.exp(- 0.62 * distances ** 0.5)
+        elif period < 1:
+            if not self.vs30_clustering:
+                # case 1, eq. (17)
+                b = 8.5 + 17.2 * period
+                return numpy.exp((- 3.0 / b) * distances)
+            else:
+                # case 2, eq. (18)
+                b = 40.7 - 15.0 * period
+                return numpy.exp((- 3.0 / b) * distances)
+        else:
+            # both cases, eq. (19)
+            b = 22.0 + 3.7 * period
+            return numpy.exp((- 3.0 / b) * distances)
