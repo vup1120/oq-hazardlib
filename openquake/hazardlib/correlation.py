@@ -125,19 +125,21 @@ class JB2009CorrelationModel(BaseCorrelationModel):
             period = 0
 
         # formulae are from page 1700
-        if period < 1:
+        if sinstance(imt, PGV):
+            return numpy.exp(- 0.62 * distances ** 0.5)
+        elif period < 1:
             if not self.vs30_clustering:
                 # case 1, eq. (17)
                 b = 8.5 + 17.2 * period
+                return numpy.exp((- 3.0 / b) * distances)
             else:
                 # case 2, eq. (18)
                 b = 40.7 - 15.0 * period
+                return numpy.exp((- 3.0 / b) * distances)
         else:
             # both cases, eq. (19)
             b = 22.0 + 3.7 * period
-
-        # eq. (20)
-        return numpy.exp((- 3.0 / b) * distances)
+            return numpy.exp((- 3.0 / b) * distances)
 
     def get_lower_triangle_correlation_matrix(self, sites, imt):
         """
