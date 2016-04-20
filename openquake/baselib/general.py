@@ -369,7 +369,8 @@ def import_all(module_or_package):
                     importlib.import_module(modname)
                 except Exception as exc:
                     print('Could not import %s: %s: %s' % (
-                        modname, exc.__class__.__name__, exc), file=sys.stderr)
+                        modname, exc.__class__.__name__, exc),
+                          file=sys.stderr)
     return set(sys.modules) - already_imported
 
 
@@ -586,15 +587,15 @@ def groupby2(records, kfield, vfield):
     :param records: a sequence of records with positional or named fields
     :param kfield: the index/name/tuple specifying the field to use as a key
     :param vfield: the index/name/tuple specifying the field to use as a value
-    :returns: an OrderedDict of lists of the form {key: [value, ...]}.
+    :returns: an list of pairs of the form (key, [value, ...]).
 
     >>> groupby2(['A1', 'A2', 'B1', 'B2', 'B3'], 0, 1)
-    OrderedDict([('A', ['1', '2']), ('B', ['1', '2', '3'])])
+    [('A', ['1', '2']), ('B', ['1', '2', '3'])]
 
     Here is an example where the keyfield is a tuple of integers:
 
     >>> groupby2(['A11', 'A12', 'B11', 'B21'], (0, 1), 2)
-    OrderedDict([(('A', '1'), ['1', '2']), (('B', '1'), ['1']), (('B', '2'), ['1'])])
+    [(('A', '1'), ['1', '2']), (('B', '1'), ['1']), (('B', '2'), ['1'])]
     """
     if isinstance(kfield, tuple):
         kgetter = operator.itemgetter(*kfield)
@@ -604,7 +605,8 @@ def groupby2(records, kfield, vfield):
         vgetter = operator.itemgetter(*vfield)
     else:
         vgetter = operator.itemgetter(vfield)
-    return groupby(records, kgetter, lambda rows: [vgetter(r) for r in rows])
+    dic = groupby(records, kgetter, lambda rows: [vgetter(r) for r in rows])
+    return list(dic.items())  # Python3 compatible
 
 
 def humansize(nbytes, suffixes=('B', 'KB', 'MB', 'GB', 'TB', 'PB')):
