@@ -8,6 +8,9 @@
     'rtheta' distances.
   * Implemented get_rupture_fraction_dipslip method to obtain 'rd' and
     'rphi' distances.
+  * Implemented the ground motion correlation model for PGV (GH2008 model)
+  * For ground motion correlation, if the intra-event sigma is not available
+    from GMPE, then the total sigma will be used.
 
   [Matteo Nastasi]
   * Backport of libhdf5 and h5py for ubuntu 'precise' serie
