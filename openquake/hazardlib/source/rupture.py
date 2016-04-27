@@ -88,217 +88,6 @@ class Rupture(object):
         self.surface_nodes = surface_nodes
         self.rupture_slip_direction = rupture_slip_direction
 
-
-class BaseProbabilisticRupture(with_metaclass(abc.ABCMeta, Rupture)):
-    """
-    Base class for a probabilistic rupture, that is a :class:`Rupture`
-    associated with a temporal occurrence model defining probability of
-    rupture occurrence in a certain time span.
-    """
-
-    @abc.abstractmethod
-    def get_probability_no_exceedance(self, poes):
-        """
-        Compute and return the probability that in the time span for which the
-        rupture is defined, the rupture itself never generates a ground motion
-        value higher than a given level at a given site.
-
-        Such calculation is performed starting from the conditional probability
-        that an occurrence of the current rupture is producing a ground motion
-        value higher than the level of interest at the site of interest.
-
-        The actual formula used for such calculation depends on the temporal
-        occurrence model the rupture is associated with.
-
-        The calculation can be performed for multiple intensity measure levels
-        and multiple sites in a vectorized fashion.
-
-        :param poes:
-            2D numpy array containing conditional probabilities the the a
-            rupture occurrence causes a ground shaking value exceeding a
-            ground motion level at a site. First dimension represent sites,
-            second dimension intensity measure levels. ``poes`` can be obtained
-            calling the :meth:`method
-            <openquake.hazardlib.gsim.base.GroundShakingIntensityModel.get_poes>`.
-        """
-
-    @abc.abstractmethod
-    def sample_number_of_occurrences(self):
-        """
-        Randomly sample number of occurrences from temporal occurrence model
-        probability distribution.
-
-        .. note::
-            This method is using random numbers. In order to reproduce the
-            same results numpy random numbers generator needs to be seeded, see
-            http://docs.scipy.org/doc/numpy/reference/generated/numpy.random.seed.html
-
-        :returns:
-            int, Number of rupture occurrences
-        """
-
-
-class NonParametricProbabilisticRupture(BaseProbabilisticRupture):
-    """
-    Probabilistic rupture for which the probability distribution for rupture
-    occurrence is described through a generic probability mass function.
-
-    :param pmf:
-        Instance of :class:`openquake.hazardlib.pmf.PMF`. Values in the
-        abscissae represent number of rupture occurrences (in increasing order,
-        staring from 0) and values in the ordinates represent associated
-        probabilities. Example: if, for a given time span, a rupture has
-        probability ``0.8`` to not occurr, ``0.15`` to occur once, and
-        ``0.05`` to occur twice, the ``pmf`` can be defined as ::
-
-          pmf = PMF([(Decimal('0.8'), 0), (Decimal('0.15'), 1),
-                      Decimal('0.05', 2)])
-
-    :raises ValueError:
-        If number of ruptures in ``pmf`` do not start from 0, are not defined
-        in increasing order, and if they are not defined with unit step
-    """
-
-    def __init__(self, mag, rake, tectonic_region_type, hypocenter, surface,
-                 source_typology, pmf, rupture_slip_direction=None):
-        x = numpy.array([x for (y, x) in pmf.data])
-        if not x[0] == 0:
-            raise ValueError('minimum number of ruptures must be zero')
-        if not numpy.all(numpy.sort(x) == x):
-            raise ValueError(
-                'numbers of ruptures must be defined in increasing order')
-        if not numpy.all(numpy.diff(x) == 1):
-            raise ValueError(
-                'numbers of ruptures must be defined with unit step')
-        super(NonParametricProbabilisticRupture, self).__init__(
-            mag, rake, tectonic_region_type, hypocenter, surface,
-            source_typology, rupture_slip_direction
-        )
-        self.pmf = pmf
-
-    def get_probability_no_exceedance(self, poes):
-        """
-        See :meth:`superclass method
-        <.rupture.BaseProbabilisticRupture.get_probability_no_exceedance>`
-        for spec of input and result values.
-
-        Uses the formula ::
-
-            ∑ p(k|T) * p(X<x|rup)^k
-
-        where ``p(k|T)`` is the probability that the rupture occurs k times in
-        the time span ``T``, ``p(X<x|rup)`` is the probability that a rupture
-        occurrence does not cause a ground motion exceedance, and the summation
-        ``∑`` is done over the number of occurrences ``k``.
-
-        ``p(k|T)`` is given by the constructor's parameter ``pmf``, and
-        ``p(X<x|rup)`` is computed as ``1 - poes``.
-        """
-        p_kT = numpy.array([float(p) for (p, _) in self.pmf.data])
-        prob_no_exceed = numpy.array(
-            [v * ((1 - poes) ** i) for i, v in enumerate(p_kT)]
-        )
-        prob_no_exceed = numpy.sum(prob_no_exceed, axis=0)
-
-        return prob_no_exceed
-
-    def sample_number_of_occurrences(self):
-        """
-        See :meth:`superclass method
-        <.rupture.BaseProbabilisticRupture.sample_number_of_occurrences>`
-        for spec of input and result values.
-
-        Uses 'Inverse Transform Sampling' method.
-        """
-        # compute cdf from pmf
-        cdf = numpy.cumsum([float(p) for p, _ in self.pmf.data])
-
-        rn = numpy.random.random()
-        [n_occ] = numpy.digitize([rn], cdf)
-
-        return n_occ
-
-
-@with_slots
-class ParametricProbabilisticRupture(BaseProbabilisticRupture):
-    """
-    :class:`Rupture` associated with an occurrence rate and a temporal
-    occurrence model.
-
-    :param occurrence_rate:
-        Number of times rupture happens per year.
-    :param temporal_occurrence_model:
-        Temporal occurrence model assigned for this rupture. Should
-        be an instance of :class:`openquake.hazardlib.tom.PoissonTOM`.
-
-    :raises ValueError:
-        If occurrence rate is not positive.
-    """
-    _slots_ = Rupture._slots_ + [
-        'occurrence_rate', 'temporal_occurrence_model']
-
-    def __init__(self, mag, rake, tectonic_region_type, hypocenter, surface,
-                 source_typology, occurrence_rate, temporal_occurrence_model,
-                 rupture_slip_direction=None):
-        if not occurrence_rate > 0:
-            raise ValueError('occurrence rate must be positive')
-        super(ParametricProbabilisticRupture, self).__init__(
-            mag, rake, tectonic_region_type, hypocenter, surface,
-            source_typology, rupture_slip_direction
-        )
-        self.temporal_occurrence_model = temporal_occurrence_model
-        self.occurrence_rate = occurrence_rate
-
-    def get_probability_one_or_more_occurrences(self):
-        """
-        Return the probability of this rupture to occur one or more times.
-
-        Uses
-        :meth:`~openquake.hazardlib.tom.PoissonTOM.get_probability_one_or_more_occurrences`
-        of an assigned temporal occurrence model.
-        """
-        tom = self.temporal_occurrence_model
-        rate = self.occurrence_rate
-        return tom.get_probability_one_or_more_occurrences(rate)
-
-    def get_probability_one_occurrence(self):
-        """
-        Return the probability of this rupture to occur exactly one time.
-
-        Uses :meth:
-        `~openquake.hazardlib.tom.PoissonTOM.get_probability_one_occurrence`
-        of an assigned temporal occurrence model.
-        """
-        tom = self.temporal_occurrence_model
-        rate = self.occurrence_rate
-        return tom.get_probability_one_occurrence(rate)
-
-    def sample_number_of_occurrences(self):
-        """
-        Draw a random sample from the distribution and return a number
-        of events to occur.
-
-        Uses :meth:
-        `~openquake.hazardlib.tom.PoissonTOM.sample_number_of_occurrences`
-        of an assigned temporal occurrence model.
-        """
-        return self.temporal_occurrence_model.sample_number_of_occurrences(
-            self.occurrence_rate
-        )
-
-    def get_probability_no_exceedance(self, poes):
-        """
-        See :meth:`superclass method
-        <.rupture.BaseProbabilisticRupture.get_probability_no_exceedance>`
-        for spec of input and result values.
-
-        Uses
-        :meth:`~openquake.hazardlib.tom.PoissonTOM.get_probability_no_exceedance`
-        """
-        tom = self.temporal_occurrence_model
-        rate = self.occurrence_rate
-        return tom.get_probability_no_exceedance(rate, poes)
-
     def get_dppvalue(self, site):
         """
         Get the directivity prediction value, DPP at
@@ -382,7 +171,7 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
 
         return dpp
 
-    def get_cdppvalue(self, target, buf=1.0, delta=0.01, space=2.):
+    def get_cdppvalue(self, target, buf=0.7, delta=0.1, space=5.):
         """
         Get the directivity prediction value, centred DPP(cdpp) at
         a given site as described in Spudich et al. (2013), and this cdpp is
@@ -620,3 +409,214 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
             return numpy.rad2deg(rup_azimuth)
         else:
             return rup_distance
+
+
+class BaseProbabilisticRupture(with_metaclass(abc.ABCMeta, Rupture)):
+    """
+    Base class for a probabilistic rupture, that is a :class:`Rupture`
+    associated with a temporal occurrence model defining probability of
+    rupture occurrence in a certain time span.
+    """
+
+    @abc.abstractmethod
+    def get_probability_no_exceedance(self, poes):
+        """
+        Compute and return the probability that in the time span for which the
+        rupture is defined, the rupture itself never generates a ground motion
+        value higher than a given level at a given site.
+
+        Such calculation is performed starting from the conditional probability
+        that an occurrence of the current rupture is producing a ground motion
+        value higher than the level of interest at the site of interest.
+
+        The actual formula used for such calculation depends on the temporal
+        occurrence model the rupture is associated with.
+
+        The calculation can be performed for multiple intensity measure levels
+        and multiple sites in a vectorized fashion.
+
+        :param poes:
+            2D numpy array containing conditional probabilities the the a
+            rupture occurrence causes a ground shaking value exceeding a
+            ground motion level at a site. First dimension represent sites,
+            second dimension intensity measure levels. ``poes`` can be obtained
+            calling the :meth:`method
+            <openquake.hazardlib.gsim.base.GroundShakingIntensityModel.get_poes>`.
+        """
+
+    @abc.abstractmethod
+    def sample_number_of_occurrences(self):
+        """
+        Randomly sample number of occurrences from temporal occurrence model
+        probability distribution.
+
+        .. note::
+            This method is using random numbers. In order to reproduce the
+            same results numpy random numbers generator needs to be seeded, see
+            http://docs.scipy.org/doc/numpy/reference/generated/numpy.random.seed.html
+
+        :returns:
+            int, Number of rupture occurrences
+        """
+
+
+class NonParametricProbabilisticRupture(BaseProbabilisticRupture):
+    """
+    Probabilistic rupture for which the probability distribution for rupture
+    occurrence is described through a generic probability mass function.
+
+    :param pmf:
+        Instance of :class:`openquake.hazardlib.pmf.PMF`. Values in the
+        abscissae represent number of rupture occurrences (in increasing order,
+        staring from 0) and values in the ordinates represent associated
+        probabilities. Example: if, for a given time span, a rupture has
+        probability ``0.8`` to not occurr, ``0.15`` to occur once, and
+        ``0.05`` to occur twice, the ``pmf`` can be defined as ::
+
+          pmf = PMF([(Decimal('0.8'), 0), (Decimal('0.15'), 1),
+                      Decimal('0.05', 2)])
+
+    :raises ValueError:
+        If number of ruptures in ``pmf`` do not start from 0, are not defined
+        in increasing order, and if they are not defined with unit step
+    """
+
+    def __init__(self, mag, rake, tectonic_region_type, hypocenter, surface,
+                 source_typology, pmf, rupture_slip_direction=None):
+        x = numpy.array([x for (y, x) in pmf.data])
+        if not x[0] == 0:
+            raise ValueError('minimum number of ruptures must be zero')
+        if not numpy.all(numpy.sort(x) == x):
+            raise ValueError(
+                'numbers of ruptures must be defined in increasing order')
+        if not numpy.all(numpy.diff(x) == 1):
+            raise ValueError(
+                'numbers of ruptures must be defined with unit step')
+        super(NonParametricProbabilisticRupture, self).__init__(
+            mag, rake, tectonic_region_type, hypocenter, surface,
+            source_typology, rupture_slip_direction
+        )
+        self.pmf = pmf
+
+    def get_probability_no_exceedance(self, poes):
+        """
+        See :meth:`superclass method
+        <.rupture.BaseProbabilisticRupture.get_probability_no_exceedance>`
+        for spec of input and result values.
+
+        Uses the formula ::
+
+            ∑ p(k|T) * p(X<x|rup)^k
+
+        where ``p(k|T)`` is the probability that the rupture occurs k times in
+        the time span ``T``, ``p(X<x|rup)`` is the probability that a rupture
+        occurrence does not cause a ground motion exceedance, and the summation
+        ``∑`` is done over the number of occurrences ``k``.
+
+        ``p(k|T)`` is given by the constructor's parameter ``pmf``, and
+        ``p(X<x|rup)`` is computed as ``1 - poes``.
+        """
+        p_kT = numpy.array([float(p) for (p, _) in self.pmf.data])
+        prob_no_exceed = numpy.array(
+            [v * ((1 - poes) ** i) for i, v in enumerate(p_kT)]
+        )
+        prob_no_exceed = numpy.sum(prob_no_exceed, axis=0)
+
+        return prob_no_exceed
+
+    def sample_number_of_occurrences(self):
+        """
+        See :meth:`superclass method
+        <.rupture.BaseProbabilisticRupture.sample_number_of_occurrences>`
+        for spec of input and result values.
+
+        Uses 'Inverse Transform Sampling' method.
+        """
+        # compute cdf from pmf
+        cdf = numpy.cumsum([float(p) for p, _ in self.pmf.data])
+
+        rn = numpy.random.random()
+        [n_occ] = numpy.digitize([rn], cdf)
+
+        return n_occ
+
+
+@with_slots
+class ParametricProbabilisticRupture(BaseProbabilisticRupture):
+    """
+    :class:`Rupture` associated with an occurrence rate and a temporal
+    occurrence model.
+
+    :param occurrence_rate:
+        Number of times rupture happens per year.
+    :param temporal_occurrence_model:
+        Temporal occurrence model assigned for this rupture. Should
+        be an instance of :class:`openquake.hazardlib.tom.PoissonTOM`.
+
+    :raises ValueError:
+        If occurrence rate is not positive.
+    """
+    _slots_ = Rupture._slots_ + [
+        'occurrence_rate', 'temporal_occurrence_model']
+
+    def __init__(self, mag, rake, tectonic_region_type, hypocenter, surface,
+                 source_typology, occurrence_rate, temporal_occurrence_model,
+                 rupture_slip_direction=None):
+        if not occurrence_rate > 0:
+            raise ValueError('occurrence rate must be positive')
+        super(ParametricProbabilisticRupture, self).__init__(
+            mag, rake, tectonic_region_type, hypocenter, surface,
+            source_typology, rupture_slip_direction
+        )
+        self.temporal_occurrence_model = temporal_occurrence_model
+        self.occurrence_rate = occurrence_rate
+
+    def get_probability_one_or_more_occurrences(self):
+        """
+        Return the probability of this rupture to occur one or more times.
+
+        Uses
+        :meth:`~openquake.hazardlib.tom.PoissonTOM.get_probability_one_or_more_occurrences`
+        of an assigned temporal occurrence model.
+        """
+        tom = self.temporal_occurrence_model
+        rate = self.occurrence_rate
+        return tom.get_probability_one_or_more_occurrences(rate)
+
+    def get_probability_one_occurrence(self):
+        """
+        Return the probability of this rupture to occur exactly one time.
+
+        Uses :meth:
+        `~openquake.hazardlib.tom.PoissonTOM.get_probability_one_occurrence`
+        of an assigned temporal occurrence model.
+        """
+        tom = self.temporal_occurrence_model
+        rate = self.occurrence_rate
+        return tom.get_probability_one_occurrence(rate)
+
+    def sample_number_of_occurrences(self):
+        """
+        Draw a random sample from the distribution and return a number
+        of events to occur.
+
+        Uses :meth:
+        `~openquake.hazardlib.tom.PoissonTOM.sample_number_of_occurrences`
+        of an assigned temporal occurrence model.
+        """
+        return self.temporal_occurrence_model.sample_number_of_occurrences(
+            self.occurrence_rate
+        )
+
+    def get_probability_no_exceedance(self, poes):
+        """
+        See :meth:`superclass method
+        <.rupture.BaseProbabilisticRupture.get_probability_no_exceedance>`
+        for spec of input and result values.
+
+        Uses
+        :meth:`~openquake.hazardlib.tom.PoissonTOM.get_probability_no_exceedance`
+        """
+        tom = self.temporal_occurrence_model
+        rate = self.occurrence_rate
+        return tom.get_probability_no_exceedance(rate, poes)
