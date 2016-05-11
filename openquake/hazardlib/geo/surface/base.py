@@ -439,7 +439,7 @@ class BaseQuadrilateralSurface(with_metaclass(abc.ABCMeta, BaseSurface)):
 
         :param return_top_edge_index:
             If ``True`` , the indices of the top edge on the rupture mesh are
-            return.
+            returned.
         :param float angle_var:
             Number representing the maximum deviation (in degrees) admitted
             without the creation of a new segment

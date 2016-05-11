@@ -277,9 +277,9 @@ class NonParametricProbabilisticRuptureTestCase(unittest.TestCase):
         self.assertAlmostEqual(p_occs_2, 0.1, places=2)
 
 
-class SomevilleRuptureParameterTest(unittest.TestCase):
+class SomervilleRuptureParameterTest(unittest.TestCase):
 
-    def make_rupture_somevilletest_non_dipping(self, rupture_class, **kwargs):
+    def make_rupture_somervilletest_non_dipping(self, rupture_class, **kwargs):
         # Create the rupture surface.
         upper_seismogenic_depth = 0.
         lower_seismogenic_depth = 15.
@@ -305,8 +305,8 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
             assert getattr(rupture, key) is kwargs[key]
         return rupture
 
-    def test_someville_purestrikeslip(self):
-        rupture = self.make_rupture_somevilletest_non_dipping(
+    def test_somerville_purestrikeslip(self):
+        rupture = self.make_rupture_somervilletest_non_dipping(
             ParametricProbabilisticRupture, occurrence_rate=0.01,
             temporal_occurrence_model=PoissonTOM(50))
         sites = Mesh.from_points_list([Point(10., 45.5), Point(11., 45.5),
@@ -321,7 +321,7 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
         self.assertTrue(numpy.allclose(phi, [0., 90., 90., 0., 34.427],
                                        atol=0.5))
 
-    def make_rupture_somevilletest_dipping(self, rupture_class, **kwargs):
+    def make_rupture_somervilletest_dipping(self, rupture_class, **kwargs):
         # Create the rupture surface.
         upper_seismogenic_depth = 0.
         lower_seismogenic_depth = 15.
@@ -347,8 +347,8 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
             assert getattr(rupture, key) is kwargs[key]
         return rupture
 
-    def test_someville_dipping_strikeslip(self):
-        rupture = self.make_rupture_somevilletest_dipping(
+    def test_somerville_dipping_strikeslip(self):
+        rupture = self.make_rupture_somervilletest_dipping(
             ParametricProbabilisticRupture, occurrence_rate=0.01,
             temporal_occurrence_model=PoissonTOM(50))
         sites = Mesh.from_points_list([Point(10., 45.5), Point(11., 45.5),
@@ -362,8 +362,8 @@ class SomevilleRuptureParameterTest(unittest.TestCase):
         self.assertTrue(numpy.allclose(
             phi, [16.225, 71.2857, 74.3514, 4.5921, 38.5859], atol=1.0))
 
-    def test_someville_dipslip(self):
-        rupture = self.make_rupture_somevilletest_dipping(
+    def test_somerville_dipslip(self):
+        rupture = self.make_rupture_somervilletest_dipping(
             ParametricProbabilisticRupture, occurrence_rate=0.01,
             temporal_occurrence_model=PoissonTOM(50))
         sites = Mesh.from_points_list([Point(10., 45.719), Point(11., 45.719),

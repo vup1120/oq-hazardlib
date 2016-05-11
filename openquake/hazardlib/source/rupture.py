@@ -468,7 +468,7 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         top_edge = self.surface.get_resampled_top_edge()
         if len(top_edge) > 2:
             raise ValueError(
-                'multi-segment rupture calculation has not yet been available')
+                'multi-segment rupture calculation not yet implemented')
 
         idxs = self.surface.mesh.geodetic_min_distance(target, indices=True)
         cls_lon = self.surface.mesh.lons.take(idxs)

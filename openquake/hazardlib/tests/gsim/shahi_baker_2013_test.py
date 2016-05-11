@@ -16,8 +16,7 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with OpenQuake. If not, see <http://www.gnu.org/licenses/>.
 
-from openquake.hazardlib.gsim.shahi_baker_2013 import (
-    ShahiBaker2013)
+from openquake.hazardlib.gsim.shahi_baker_2013 import ShahiBaker2013
 
 from openquake.hazardlib.tests.gsim.utils import BaseGSIMTestCase
 

@@ -125,30 +125,17 @@ class GmfComputer(object):
         for imt in self.imts:
             if gsim.DEFINED_FOR_STANDARD_DEVIATION_TYPES == \
                set([StdDev.TOTAL]):
-                # If the GSIM provides only total standard deviation, we need
-                # to compute mean and total standard deviation at the sites
-                # of interest.
-                # In this case, we also assume no correlation model is used.
-                #if self.correlation_model:
-                #    raise CorrelationButNoInterIntraStdDevs(
-                #        self.correlation_model, gsim)
-
                 mean, [stddev_total] = gsim.get_mean_and_stddevs(
                     sctx, rctx, dctx, imt, [StdDev.TOTAL])
                 stddev_total = stddev_total.reshape(stddev_total.shape + (1, ))
                 mean = mean.reshape(mean.shape + (1, ))
 
                 total_residual = stddev_total * distribution.rvs(
-<<<<<<< HEAD
-                    size=(len(self.sites), realizations)
-                )
+                    size=(len(self.sites), realizations))
                 if self.correlation_model is not None:
                     total_residual = self.correlation_model.apply_correlation(
-                        self.sites, imt, total_residual
-                    )
-=======
-                    size=(len(self.sites), realizations))
->>>>>>> upstream/master
+                        self.sites, imt, total_residual)
+
                 gmf = gsim.to_imt_unit_values(mean + total_residual)
             else:
                 mean, [stddev_inter, stddev_intra] = gsim.get_mean_and_stddevs(
