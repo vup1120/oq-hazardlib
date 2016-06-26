@@ -378,8 +378,10 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
                 idx_nxtp = True
 
         # calculate DPP value of the site.
-        dpp = numpy.log(numpy.sum(dpp_multi))
-
+        if numpy.sum(dpp_multi) > 0.:
+            dpp = numpy.log(numpy.sum(dpp_multi))
+        else:
+            dpp = numpy.log(0.8 * 0.1 * f * 0.2)
         return dpp
 
     def get_cdppvalue(self, target, buf=1.0, delta=0.01, space=2.):
@@ -426,24 +428,26 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
 
         for iloc, (target_lon, target_lat) in enumerate(zip(target_lons,
                                                             target_lats)):
+            if target_rup[iloc] <= 70.:
+                cdpp_sites_lats = mesh.lats[(mesh_rup <= target_rup[iloc] + space)
+                                            & (mesh_rup >= target_rup[iloc]
+                                               - space)]
+                cdpp_sites_lons = mesh.lons[(mesh_rup <= target_rup[iloc] + space)
+                                            & (mesh_rup >= target_rup[iloc]
+                                               - space)]
 
-            cdpp_sites_lats = mesh.lats[(mesh_rup <= target_rup[iloc] + space)
-                                        & (mesh_rup >= target_rup[iloc]
-                                           - space)]
-            cdpp_sites_lons = mesh.lons[(mesh_rup <= target_rup[iloc] + space)
-                                        & (mesh_rup >= target_rup[iloc]
-                                           - space)]
+                dpp_sum = []
+                dpp_target = self.get_dppvalue(Point(target_lon, target_lat))
 
-            dpp_sum = []
-            dpp_target = self.get_dppvalue(Point(target_lon, target_lat))
+                for lon, lat in zip(cdpp_sites_lons, cdpp_sites_lats):
+                    site = Point(lon, lat, 0.)
+                    dpp_one = self.get_dppvalue(site)
+                    dpp_sum.append(dpp_one)
 
-            for lon, lat in zip(cdpp_sites_lons, cdpp_sites_lats):
-                site = Point(lon, lat, 0.)
-                dpp_one = self.get_dppvalue(site)
-                dpp_sum.append(dpp_one)
-
-            mean_dpp = numpy.mean(dpp_sum)
-            cdpp[iloc] = dpp_target - mean_dpp
+                mean_dpp = numpy.mean(dpp_sum)
+                cdpp[iloc] = dpp_target - mean_dpp
+            else:
+                cdpp[iloc] = 0.
 
         return cdpp
 
