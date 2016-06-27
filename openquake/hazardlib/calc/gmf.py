@@ -32,20 +32,6 @@ from openquake.hazardlib.gsim.base import ContextMaker
 from openquake.hazardlib.imt import from_string
 
 
-class CorrelationButNoInterIntraStdDevs(Exception):
-    def __init__(self, corr, gsim):
-        self.corr = corr
-        self.gsim = gsim
-
-#    def __str__(self):
-#        return '''\
-#You cannot use the correlation model %s with the GSIM %s, \
-#that defines only the total standard deviation. If you want to use a \
-#correlation model you have to select a GMPE that provides the inter and \
-#intra event standard deviations.''' % (
-#            self.corr.__class__.__name__, self.gsim.__class__.__name__)
-
-
 class GmfComputer(object):
     """
     Given an earthquake rupture, the ground motion field computer computes
@@ -124,12 +110,8 @@ class GmfComputer(object):
 
                 total_residual = stddev_total * distribution.rvs(
 
-                    size=(len(self.sites), realizations))
-                if self.correlation_model is not None:
-                    total_residual = self.correlation_model.apply_correlation(
-                        self.sites, imt, total_residual)
+                    size=(len(self.sites), num_events))
 
-                    size=(len(self.sites), num_events)
                 gmf = gsim.to_imt_unit_values(mean + total_residual)
             else:
                 mean, [stddev_inter, stddev_intra] = gsim.get_mean_and_stddevs(
