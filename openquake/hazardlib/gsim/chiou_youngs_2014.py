@@ -365,6 +365,20 @@ class ChiouYoungs2014NearFaultBayless(ChiouYoungs2014):
     10.0   -0.300   0.115  -0.176   0.179
     """)
 
+    SIGMARUDCTION_FACTOR = CoeffsTable(sa_damping=5., table="""
+    IMT     TAU_R
+    0.50    -0.000
+    0.75    -0.000
+    1.00    -0.000
+    1.50    -0.000
+    2.00    -0.00175
+    3.00    -0.00675
+    4.00    -0.01
+    5.00    -0.01575
+    7.50    -0.01475
+    10.0    -0.01775
+    """)
+
     #: Required distance measures are Rrup and Rjb.
     REQUIRES_DISTANCES = set(('rrup', 'rjb', 'rx', 'rgeomSS', 'rtaperSS', 'rgeomDS', 'rtaperDS'))
 
@@ -390,8 +404,8 @@ class ChiouYoungs2014NearFaultBayless(ChiouYoungs2014):
             costheta = np.abs(np.cos(np.radians(rup.rake)))
             refrake = np.arctan2(sintheta, costheta)
 
-            # Compute weights:
+            # Compute weights
             DipWeight = refrake / (np.pi / 2.0)
             StrikeWeight = 1.0 - DipWeight
             corrector = StrikeWeight * fd_SS + DipWeight * fd_DS
-        return mean + corrector, stddevs
+        return mean + corrector, stddevs + np.array(self.SIGMARUDCTION_FACTOR[imt]["TAU_R"])
