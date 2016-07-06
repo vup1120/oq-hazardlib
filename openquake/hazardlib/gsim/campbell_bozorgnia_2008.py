@@ -412,3 +412,4 @@ class CampbellBozorgnia2008Arbitrary(CampbellBozorgnia2008):
         ground motion defined by equation 18, page 150
         """
         return np.sqrt(std_intra ** 2. + std_inter ** 2. + C['c_lny'] ** 2.)
+

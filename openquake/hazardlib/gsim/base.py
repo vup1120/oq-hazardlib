@@ -131,13 +131,21 @@ def get_distances(rupture, mesh, param='rjb'):
     elif param == 'rcdpp':
         dist = rupture.get_cdppvalue(mesh)
     elif param == 'rs':
-        dist = rupture.get_rupture_fraction_strikeslip(mesh, angle=False)
+        dist = rupture.get_somerviller_rupture_parameters(mesh, output=1)
     elif param == 'rtheta':
-        dist = rupture.get_rupture_fraction_strikeslip(mesh, angle=True)
+        dist = rupture.get_somerviller_rupture_parameters(mesh, output=2)
     elif param == 'rd':
-        dist = rupture.get_rupture_fraction_dipslip(mesh, angle=False)
+        dist = rupture.get_somerviller_rupture_parameters(mesh, output=3)
     elif param == 'rphi':
-        dist = rupture.get_rupture_fraction_dipslip(mesh, angle=True)
+        dist = rupture.get_somerviller_rupture_parameters(mesh, output=4)
+    elif param == 'rgeomSS':
+        dist = rupture.get_bayless2013fd(mesh, output=1)
+    elif param == 'rtaperSS':
+        dist = rupture.get_bayless2013fd(mesh, output=2)
+    elif param == 'rgeomDS':
+        dist = rupture.get_bayless2013fd(mesh, output=3)
+    elif param == 'rtaperDS':
+        dist = rupture.get_bayless2013fd(mesh, output=4)
     else:
         raise ValueError('Unknown distance measure %r' % param)
     return dist
@@ -844,7 +852,8 @@ class DistancesContext(BaseContext):
     in a result context object.
     """
     _slots_ = ('rrup', 'rx', 'rjb', 'rhypo', 'repi', 'ry0', 'rcdpp',
-               'azimuth', 'hanging_wall', 'rs', 'rtheta', 'rd', 'rphi')
+               'azimuth', 'hanging_wall', 'rs', 'rtheta', 'rd', 'rphi',
+               'rgeomSS', 'rtaperSS', 'rgeomDS', 'rtaperDS')
 
 
 class RuptureContext(BaseContext):

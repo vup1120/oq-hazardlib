@@ -344,3 +344,54 @@ class ChiouYoungs2014NearFaultEffect(ChiouYoungs2014):
         centered_dpp = dists.rcdpp
 
         return centered_dpp
+
+class ChiouYoungs2014NearFaultBayless(ChiouYoungs2014):
+    """
+    Applies the GMPE with a modified scaling factor that
+    introduced by near-fault directivity. The prediction is from 
+    Bayless and Somerville, 2013 directivity model
+    """
+    SCALING_FACTOR = CoeffsTable(sa_damping=5., table="""
+    IMT     C0_SS   C1_SS   C0_DS   C1_DS
+    0.50    0.000   0.000   0.000   0.000
+    0.75    0.000   0.000   0.000   0.000
+    1.00   -0.120   0.075   0.000   0.000
+    1.50   -0.175   0.090   0.000   0.000
+    2.00   -0.210   0.095   0.000   0.034
+    3.00   -0.235   0.099  -0.033   0.093
+    4.00   -0.255   0.103  -0.089   0.128
+    5.00   -0.275   0.108  -0.133   0.150
+    7.50   -0.290   0.112  -0.160   0.165
+    10.0   -0.300   0.115  -0.176   0.179
+    """)
+
+    #: Required distance measures are Rrup and Rjb.
+    REQUIRES_DISTANCES = set(('rrup', 'rjb', 'rx', 'rgeomSS', 'rtaperSS', 'rgeomDS', 'rtaperDS'))
+
+    def get_mean_and_stddevs(self, sites, rup, dists, imt, stddev_types):
+        """
+        Returns the frequency-dependent scaled mean and standard deviation
+        """
+        mean, stddevs = super(ChiouYoungs2014NearFaultBayless, self).get_mean_and_stddevs(
+            sites, rup, dists, imt, stddev_types)
+
+        fd_SS = (self.SCALING_FACTOR[imt]["C0_SS"] +
+                self.SCALING_FACTOR[imt]["C1_SS"] * dists.rgeomSS) * dists.rtaperSS
+        fd_DS = (self.SCALING_FACTOR[imt]["C0_DS"] +
+                self.SCALING_FACTOR[imt]["C1_DS"] * dists.rgeomDS) * dists.rtaperDS
+
+        arake = np.abs(rup.rake)
+        if ((arake >= 0) and (arake <= 30)) or ((arake >= 150) and (arake <= 180)):
+            corrector = fd_SS
+        elif (arake >= 60) and (arake <= 120):
+            corrector = fd_DS
+        else:
+            sintheta = np.abs(np.sin(np.radians(rup.rake)))
+            costheta = np.abs(np.cos(np.radians(rup.rake)))
+            refrake = np.arctan2(sintheta, costheta)
+
+            # Compute weights:
+            DipWeight = refrake / (np.pi / 2.0)
+            StrikeWeight = 1.0 - DipWeight
+            corrector = StrikeWeight * fd_SS + DipWeight * fd_DS
+        return mean + corrector, stddevs

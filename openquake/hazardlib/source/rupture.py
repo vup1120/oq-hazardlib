@@ -33,6 +33,7 @@ from openquake.hazardlib.near_fault import (get_plane_equation, projection_pp,
                                             isochone_ratio, get_xyz_from_ll,
                                             vectors2angle)
 from openquake.baselib.python3compat import with_metaclass
+from openquake.hazardlib.bayless2013model import *
 
 
 @with_slots
@@ -451,7 +452,7 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
 
         return cdpp
 
-    def get_rupture_fraction_strikeslip(self, target, angle=False):
+    def get_somerviller_rupture_parameters(self, target, output=1):
         """
         Obtain the distance parameters needed to predict directivity for
         strike-slip event defined by Somerville et al., 1997, page 205.
@@ -461,166 +462,102 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         :param angle:
             If ``True`` (by default), the rup_azimuth is calculated. If this
             is set to ``False``, the rup_distance is calculated.
+        :param output:
+            1: s
+            2: theta
+            3: d
+            4: az
         :returns:
-            rup_distance, a numpy array, represents the rupture fraction
-            distance to the target site.
-            rup_azimuth, a numpy array, represents the angle between the
+            s, a numpy array, represents the rupture fraction
+            distance to the target site for strike-slip
+            theta, a numpy array, represents the angle between the
             rupture direction and the path to the site with respect to the
-            rupture (measured in degrees herein)
-        """
-        # check if the rupture is multi-segment
-        top_edge = self.surface.get_resampled_top_edge()
-        if len(top_edge) > 2:
-            raise ValueError(
-                'multi-segment rupture calculation not yet implemented')
-
-        idxs = self.surface.mesh.geodetic_min_distance(target, indices=True)
-        cls_lon = self.surface.mesh.lons.take(idxs)
-        cls_lat = self.surface.mesh.lats.take(idxs)
-        s_lon = target.lons
-        s_lat = target.lats
-        epi = Point(self.hypocenter.longitude, self.hypocenter.latitude)
-
-        # To calculate the effect of directivity, we calculate the rupture
-        # fraction length from epicentre(along strike direction as defined in
-        # Somerville et al., 1997) to the site, and the rupture angel which
-        # is the angle between the fault strike and the path to the site with
-        # respect to the rupture. We calculate first the distance between the
-        # closest point(site to the rupture) projected onto surface and
-        # epicentre. Then, we project the distance segment onto the strike
-        # diretion(assumed the rupture direction) to obtain the rupture
-        # fraction effective distance to the site.
-
-        # Obtain the strike direction vector(in Cartesian coordinate system)
-        # p_pc is one point along strike direction passing through epicentre
-        # p_pc_xy is p_pc in Cartesian coordinate system
-        # pe_xy is epicentre in Cartesian coordinate system
-        # ppc_pe is the vector from epicentre to p_pc
-        p_pc = epi.point_at(1., 0., self.surface.get_strike())
-        p_pc_xy = get_xyz_from_ll(p_pc, epi)
-        pe_xy = get_xyz_from_ll(epi, epi)
-        ppc_pe = (numpy.array(p_pc_xy) - numpy.array(pe_xy))
-
-        rup_azimuth = numpy.empty(len(cls_lon))
-        rup_distance = numpy.empty(len(cls_lon))
-        iloc = 0
-
-        for (lon, lat, slon, slat) in zip(cls_lon, cls_lat, s_lon, s_lat):
-
-            # Obtain the vector from closest point to epicentre.
-            # pc_xy is the closest point in Cartesian coordinate system
-            # pc_pe is the vector from cloest point to epicentre
-            pc_xy = get_xyz_from_ll(Point(lon, lat), epi)
-            pc_pe = (numpy.array(pc_xy) - numpy.array(pe_xy))
-
-            phi = vectors2angle(numpy.array(ppc_pe), pc_pe)
-            if phi > (math.pi / 2.):
-                phi = math.pi - phi
-
-            rup_distance[iloc] = numpy.linalg.norm(pc_pe) * numpy.cos(phi)
-            site_xy = get_xyz_from_ll(Point(slon, slat), epi)
-
-            ps_pe = (numpy.array(site_xy) - numpy.array(pe_xy))
-
-            azimuth = vectors2angle(ppc_pe, ps_pe)
-            if azimuth > (math.pi / 2.):
-                azimuth = math.pi - azimuth
-            rup_azimuth[iloc] = numpy.rad2deg(azimuth)
-            iloc += 1
-        if angle:
-            return rup_azimuth
-        else:
-            return rup_distance
-
-    def get_rupture_fraction_dipslip(self, target, angle=False):
-        """
-        Obtain the distance parameters needed to predict directivity for
-        non-strike-slip event defined by Somerville et al., 1997, page 205.
-
-        :param target:
-            A mesh object representing the location of the target sites.
-        :param angle:
-            If ``True`` (by default), the rup_azimuth is calculated. If this
-            is set to ``False``, the rup_distance is calculated.
-        :returns:
-            rup_distance, a numpy array, represents the rupture fraction
-            distance to the target site.
-            rup_azimuth, a numpy array, represents the angle between the
+            rupture (measured in degrees herein) for strike-slip
+            d, a numpy array, represents the rupture fraction
+            distance to the target site for dip-slip
+            az, a numpy array, represents the angle between the
             rupture direction and the path to the site with respect to the
-            rupture (measured in degrees herein)
+            rupture (measured in degrees herein) for dip-slip
         """
-        # check if the rupture is multi-patches
-        top_edge = self.surface.get_resampled_top_edge()
-        if len(top_edge) > 2:
-            raise ValueError(
-                'multi-segment rupture calculation has not yet been available')
 
-        hypo = self.hypocenter
-        rrup = self.surface.mesh.geodetic_min_distance(target, indices=False)
-        idxs = self.surface.mesh.geodetic_min_distance(target, indices=True)
-        s_lon = target.lons
-        s_lat = target.lats
+        fd = 0.
+        for i in range(1, len(self.surface.get_resampled_top_edge())):
+            # Read the vertices of each segment
+            P0, P1, P2, P3 = self.surface.get_fault_patch_vertices(
+                self.surface.get_resampled_top_edge(),
+                self.surface.mesh.depths[0][0],
+                self.surface.mesh.depths[-1][0],
+                self.surface.get_dip(), index_patch=i)
+                    # Set up pseudo-hypocenter
+            phyp = setPseudoHypo(i, self.surface, self.hypocenter)
+            # Currently assuming that the rake is the same on all subfaults.
+            SlipCategory = getSlipCategory(self.rake)
+            T_Mw = Magnitude_taper(self.mag)
+            surf = PlanarSurface.from_corner_points(1., P0, P1, P2, P3)
+            Rrup = surf.get_min_distance(target)
+            Rx = surf.get_rx_distance(target)
+            Ry = surf.get_ry0_distance(target)
+            weight = surf.get_area() / self.surface.get_area()
+            L = distance(P0.longitude, P0.latitude, P0.depth,
+                         P1.longitude, P1.latitude, P1.depth)
+            W = surf.get_width()
 
-        # The closest points to the rupture from the sties
-        cls_lon = self.surface.mesh.lons.take(idxs)
-        cls_lat = self.surface.mesh.lats.take(idxs)
-        cls_dep = self.surface.mesh.depths.take(idxs)
+            d = computeD(phyp, P0, P1, P2, P3, target)
+            s, theta = computeThetaAndS(phyp, P0, P1, P2, P3, target)
+            az = computeAz(Rx, Ry)
+            if output == 1:
+                return s
+            elif output == 2:
+                return np.degrees(theta)
+            elif output == 3:
+                return d
+            elif output == 4:
+                return np.degrees(az)
 
-        rhypo = self.hypocenter.distance_to_mesh(target)
-        rx = self.surface.get_rx_distance(target)
-        rup_azimuth = numpy.empty(len(cls_lon))
-        rup_distance = numpy.empty(len(cls_lon))
-        for iloc, (lon, lat, dep, slon, slat) in enumerate(zip(cls_lon,
-                                                               cls_lat,
-                                                               cls_dep,
-                                                               s_lon, s_lat)):
-            # The calculation varies for different site to rupture geometries
-            # The priciple is to get the rupture distance by applying the sine
-            # law and the cosine rule when Rrup, dip angle, and Rhypo are
-            # known.
-            if rx[iloc] == 0:
-                strike = self.surface.get_strike()
-                azimuth = (strike + 90.0) % 360
-                hdist = self.hypocenter.depth / numpy.tan(numpy.deg2rad(
-                    self.surface.get_dip()))
-                trace_top = hypo.point_at(
-                    hdist, -self.hypocenter.depth, 360 - azimuth)
-                rup_distance[iloc] = distance(
-                    self.hypocenter.longitude, self.hypocenter.latitude,
-                    self.hypocenter.depth, trace_top.longitude,
-                    trace_top.latitude, trace_top.depth)
+    def get_bayless2013fd(self, target, output=1):
+        """
+        Get the directivity prediction value, prediceted by Bayless and Somerville,
+        2013 at a given site
 
-                rup_azimuth[iloc] = numpy.arcsin(
-                    (rhypo[iloc] ** 2 - rup_distance[iloc] ** 2)
-                    ** 0.5 / rhypo[iloc])
+        :param output:
+            1: f_geom_SS
+            2: tapering_SS * weight
+            3: f_geom_DS
+            4: tapering_DS * weight
+        """
+        fd = 0.
+        for i in range(1, len(self.surface.get_resampled_top_edge())):
+            # Read the vertices of each segment
+            P0, P1, P2, P3 = self.surface.get_fault_patch_vertices(
+                self.surface.get_resampled_top_edge(),
+                self.surface.mesh.depths[0][0],
+                self.surface.mesh.depths[-1][0],
+                self.surface.get_dip(), index_patch=i)
+                    # Set up pseudo-hypocenter
+            phyp = setPseudoHypo(i, self.surface, self.hypocenter)
+            # Currently assuming that the rake is the same on all subfaults.
+            SlipCategory = getSlipCategory(self.rake)
+            T_Mw = Magnitude_taper(self.mag)
+            surf = PlanarSurface.from_corner_points(1., P0, P1, P2, P3)
+            Rrup = surf.get_min_distance(target)
+            Rx = surf.get_rx_distance(target)
+            Ry = surf.get_ry0_distance(target)
+            weight = surf.get_area() / self.surface.get_area()
+            L = distance(P0.longitude, P0.latitude, P0.depth,
+                         P1.longitude, P1.latitude, P1.depth)
+            W = surf.get_width()
 
-            if rx[iloc] > 0:
-                rup_azimuth[iloc] = numpy.arcsin(rrup[iloc] / rhypo[iloc])
-                rup_distance[iloc] = (
-                    rhypo[iloc] ** 2 - rrup[iloc] ** 2) ** 0.5
+            d = computeD(phyp, P0, P1, P2, P3, target)
+            s, theta = computeThetaAndS(phyp, P0, P1, P2, P3, target)
+            az = computeAz(Rx, Ry)
+            f_geom_SS, tapering_SS = computeSS(s, theta, target, L, T_Mw, Rrup)
+            f_geom_DS, tapering_DS = computeDS(d, az, T_Mw, Rx, Rrup, W, target)
 
-            if rx[iloc] < 0:
-                strike = self.surface.get_strike()
-                azimuth = (strike + 90.0) % 360
-
-                cls_point = Point(lon, lat, dep)
-                hdist = dep / numpy.tan(numpy.deg2rad(self.surface.get_dip()))
-                trace_top = cls_point.point_at(hdist, -dep, 360 - azimuth)
-                pc_xy = get_xyz_from_ll(cls_point, hypo)
-                site_xy = get_xyz_from_ll(Point(slon, slat), hypo)
-                trace_top_xy = get_xyz_from_ll(trace_top, hypo)
-                site_cls = (numpy.array(site_xy) - numpy.array(pc_xy))
-                top_site = (numpy.array(site_xy) - numpy.array(trace_top_xy))
-                phi = numpy.rad2deg(vectors2angle(site_cls, top_site))
-                rup_azimuth[iloc] = numpy.arcsin(
-                    rrup[iloc] / rhypo[iloc] * numpy.sin(
-                        numpy.pi - numpy.deg2rad(self.surface.get_dip())
-                        + numpy.deg2rad(phi)))
-                rup_distance[iloc] = numpy.sin(
-                    numpy.deg2rad(
-                        self.surface.get_dip()) - rup_azimuth[iloc] + angle) \
-                    / numpy.sin(rup_azimuth[iloc]) * rrup[iloc]
-        if angle:
-            return numpy.rad2deg(rup_azimuth)
-        else:
-            return rup_distance
+            if output == 1:
+                return f_geom_SS
+            elif output == 2:
+                return tapering_SS * weight
+            elif output == 3:
+                return f_geom_DS
+            elif output == 4:
+                return tapering_DS * weight
