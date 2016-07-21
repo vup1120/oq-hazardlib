@@ -129,7 +129,7 @@ def get_distances(rupture, mesh, param='rjb'):
     elif param == 'repi':
         dist = rupture.hypocenter.distance_to_mesh(mesh, with_depths=False)
     elif param == 'rcdpp':
-        dist = rupture.get_cdppvalue(mesh)
+        dist = rupture.get_predicted_cdppvalue(mesh)
     elif param == 'rs':
         dist = rupture.get_somerviller_rupture_parameters(mesh, output=1)
     elif param == 'rtheta':

@@ -38,13 +38,13 @@ def setPseudoHypo(i, surface, hypo):
     if i == index_patch:
         phyp = hypo
     elif i < index_patch:
-        row = np.round(len(surface.mesh.depths[:,80])/2)
+        row = np.round(len(surface.mesh.depths[:,0])/2)
         tmp, col = surface.get_resampled_top_edge(return_top_edge_index=True)
         phyp = Point(surface.mesh.lons[row][col[i+1]],
                      surface.mesh.lats[row][col[i+1]],
                      surface.mesh.depths[row][col[i+1]])
     elif i > index_patch:
-        row = np.round(len(surface.mesh.depths[:,80])/2)
+        row = np.round(len(surface.mesh.depths[:,0])/2)
         tmp, col = surface.get_resampled_top_edge(return_top_edge_index=True)
         phyp = Point(surface.mesh.lons[row][col[i]],
                      surface.mesh.lats[row][col[i]],

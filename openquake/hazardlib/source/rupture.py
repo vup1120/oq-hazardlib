@@ -33,6 +33,7 @@ from openquake.hazardlib.near_fault import (get_plane_equation, projection_pp,
                                             isochone_ratio, get_xyz_from_ll,
                                             vectors2angle)
 from openquake.baselib.python3compat import with_metaclass
+from scipy.optimize import curve_fit
 from openquake.hazardlib.bayless2013model import *
 
 
@@ -385,7 +386,7 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
             dpp = numpy.log(0.8 * 0.1 * f * 0.2)
         return dpp
 
-    def get_cdppvalue(self, target, buf=1.0, delta=0.01, space=2.):
+    def get_cdppvalue(self, target, buf=0.8, delta=0.5, space=5.):
         """
         Get the directivity prediction value, centred DPP(cdpp) at
         a given site as described in Spudich et al. (2013), and this cdpp is
@@ -451,6 +452,87 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
                 cdpp[iloc] = 0.
 
         return cdpp
+
+    def get_predicted_cdppvalue(self, target, buf=0.4, delta=0.05, space=5.):
+        """
+        Get the directivity prediction value, centred DPP(cdpp) at
+        a given site as described in Spudich et al. (2013), and this cdpp is
+        used in Chiou and Young(2014) GMPE for near-fault directivity
+        term prediction.
+
+        :param target_site:
+            A mesh object representing the location of the target sites.
+        :param buf:
+            A float value presents  the buffer distance in km to extend the
+            mesh borders to.
+        :param delta:
+            A float value presents the desired distance between two adjacent
+            points in mesh
+        :param space:
+            A float value presents the tolerance for the same distance of the
+            sites (default 2 km)
+        :returns:
+            A float value presents the centreed directivity predication value
+            which used in Chioud and Young(2014) GMPE for directivity term
+        """
+
+        min_lon, max_lon, max_lat, min_lat = self.surface.get_bounding_box()
+
+        min_lon -= buf
+        max_lon += buf
+        min_lat -= buf
+        max_lat += buf
+
+        lons = numpy.arange(min_lon, max_lon + delta, delta)
+        lats = numpy.arange(min_lat, max_lat + delta, delta)
+        lons, lats = numpy.meshgrid(lons, lats)
+
+        target_rup = self.surface.get_min_distance(target)
+        mesh = RectangularMesh(lons=lons, lats=lats, depths=None)
+        mesh_rup = self.surface.get_min_distance(mesh)
+
+        target_lons = target.lons
+        target_lats = target.lats
+        cdpp = numpy.zeros(len(target_lons))
+
+        dpp = []
+        for i, (gridlon, gridlat) in enumerate(zip(mesh.lons.flatten(),mesh.lats.flatten())):
+
+            dpp.append(self.get_dppvalue(Point(gridlon, gridlat)))
+        rrup_tmp = mesh_rup.flatten()
+        initial = np.array([3.5, 0.5, 0.5])
+        pars, pcov = curve_fit(self.average_dpp, rrup_tmp, dpp, initial)
+        for iloc, (target_lon, target_lat) in enumerate(zip(target_lons,
+                                                            target_lats)):
+
+            if target_rup[iloc] <= 70.:
+
+                dpp_sum = []
+                dpp_target = self.get_dppvalue(Point(target_lon, target_lat))
+                mean_dpp = self.average_dpp(target_rup[iloc], pars[0], pars[1], pars[2])
+
+                cdpp[iloc] = dpp_target - mean_dpp
+        return cdpp
+    def average_dpp(self, rrup, a, b, c):
+        """
+        Obtain the distance parameters needed to predict directivity for
+        strike-slip event defined by Somerville et al., 1997, page 205.
+
+        :param rrup:
+            An numpy array represents of clostest distance to the fault from the sites
+        :param a:
+            A coefficient obtained by data fitting
+        :param b:
+            A coefficient obtained by data fitting
+        :param c:
+            A coefficient obtained by data fitting
+
+        :returns:
+            A numpy array, represents of predicted average dpp values
+        """
+        ztor = self.surface.mesh.depths[0][0]
+        ztor = 0.
+        return a + (b / np.cosh(np.abs(c) * (rrup-ztor).clip(0, np.inf)))
 
     def get_somerviller_rupture_parameters(self, target, output=1):
         """

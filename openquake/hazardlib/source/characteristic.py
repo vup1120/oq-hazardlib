@@ -20,7 +20,10 @@ Module :mod:`openquake.hazardlib.source.characteristic` defines
 import numpy
 
 from openquake.hazardlib.source.base import ParametricSeismicSource
+from openquake.hazardlib.geo.surface.simple_fault import SimpleFaultSurface
 from openquake.hazardlib.geo.mesh import RectangularMesh
+from openquake.hazardlib.geo.geodetic import distance
+
 from openquake.hazardlib.geo import NodalPlane
 from openquake.hazardlib.source.rupture import ParametricProbabilisticRupture
 from openquake.baselib.slots import with_slots
@@ -56,12 +59,13 @@ class CharacteristicFaultSource(ParametricSeismicSource):
     as a LiteralNode object.
     """
     _slots_ = ParametricSeismicSource._slots_ + (
-        'surface surface_node rake').split()
+        'surface surface_node rake hypo_list slip_list').split()
 
     MODIFICATIONS = set(('set_geometry',))
 
     def __init__(self, source_id, name, tectonic_region_type,
                  mfd, temporal_occurrence_model, surface, rake,
+                 hypo_list=(), slip_list=(),
                  surface_node=None):
         super(CharacteristicFaultSource, self).__init__(
             source_id, name, tectonic_region_type, mfd, None, None, None,
@@ -71,6 +75,14 @@ class CharacteristicFaultSource(ParametricSeismicSource):
         self.surface = surface
         self.rake = rake
         self.surface_node = surface_node
+
+        self.slip_list = slip_list
+        self.hypo_list = hypo_list
+
+        if (len(self.hypo_list) and not len(self.slip_list) or
+           not len(self.hypo_list) and len(self.slip_list)):
+            raise ValueError('hypo_list and slip_list have to be both given '
+                             'or neither given')
 
     def get_rupture_enclosing_polygon(self, dilation=0):
         """
@@ -96,6 +108,7 @@ class CharacteristicFaultSource(ParametricSeismicSource):
                                numpy.array([[north, north], [south, south]]),
                                None)
         poly = mesh.get_convex_hull()
+        self.mesh = mesh
 
         return poly.dilate(dilation)
 
@@ -107,20 +120,49 @@ class CharacteristicFaultSource(ParametricSeismicSource):
         For each magnitude value in the given MFD, return an earthquake
         rupture with a surface always equal to the given surface.
         """
-        hypocenter = self.surface.get_middle_point()
         for (mag, occurrence_rate) in self.get_annual_occurrence_rates():
-            yield ParametricProbabilisticRupture(
-                mag, self.rake, self.tectonic_region_type, hypocenter,
-                self.surface, type(self), occurrence_rate,
-                self.temporal_occurrence_model
-            )
 
+            if not len(self.hypo_list) and not len(self.slip_list):
+                hypocenter = self.surface.get_middle_point()
+
+                yield ParametricProbabilisticRupture(
+                    mag, self.rake, self.tectonic_region_type, hypocenter,
+                    self.surface, type(self), occurrence_rate,
+                    self.temporal_occurrence_model
+                )
+            
+            else:
+
+                for hypo in self.hypo_list:
+                    for slip in self.slip_list:
+                        # Set rupture_mesh_spacing=1km
+
+                        surface = SimpleFaultSurface(self.surface.mesh)
+                        mesh_spacing = 1.0
+                        #print('mesh',mesh_spacing)
+                        hypocenter = surface.get_hypo_location(
+                            mesh_spacing, hypo[:2])
+                        occurrence_rate_hypo = occurrence_rate * \
+                            hypo[2] * slip[1]
+                        rupture_slip_direction = slip[0]
+
+                        yield ParametricProbabilisticRupture(
+                            mag, self.rake, self.tectonic_region_type,
+                            hypocenter, surface, type(self),
+                            occurrence_rate_hypo,
+                            self.temporal_occurrence_model,
+                            rupture_slip_direction
+                        )
+            
+    
     def count_ruptures(self):
         """
         See :meth:
         `openquake.hazardlib.source.base.BaseSeismicSource.count_ruptures`.
         """
-        return len(self.get_annual_occurrence_rates())
+        n_hypo = len(self.hypo_list) or 1
+        n_slip = len(self.slip_list) or 1
+        return len(self.get_annual_occurrence_rates()) * n_hypo * n_slip
 
     def modify_set_geometry(self, surface, surface_node=None):
         """
