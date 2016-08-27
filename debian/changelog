@@ -13,7 +13,9 @@
     from GMPE, then the total sigma will be used.
 
   [Michele Simionato]
-  Fixed the encode/decode functions in baselib.python3compat
+  * Added a simple argument parser in baselib
+  * Replaced pydoc.locate with a call to importlib to work around a QGIS issue
+  * Fixed the encode/decode functions in baselib.python3compat
 
   [Daniele Viganò]
   * Added Python 3 compatibility to speedups
