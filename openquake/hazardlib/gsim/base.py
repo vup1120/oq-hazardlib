@@ -129,7 +129,7 @@ def get_distances(rupture, mesh, param='rjb'):
     elif param == 'repi':
         dist = rupture.hypocenter.distance_to_mesh(mesh, with_depths=False)
     elif param == 'rcdpp':
-        dist = rupture.get_cdppvalue(mesh)
+        dist = rupture.get_predicted_cdppvalue(mesh)
     else:
         raise ValueError('Unknown distance measure %r' % param)
     return dist
