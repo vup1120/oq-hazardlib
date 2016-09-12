@@ -505,13 +505,11 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         for iloc, (target_lon, target_lat) in enumerate(zip(target_lons,
                                                             target_lats)):
 
-            if target_rup[iloc] <= 70.:
+            dpp_sum = []
+            dpp_target = self.get_dppvalue(Point(target_lon, target_lat))
+            mean_dpp = self.average_dpp(target_rup[iloc], pars[0], pars[1], pars[2])
 
-                dpp_sum = []
-                dpp_target = self.get_dppvalue(Point(target_lon, target_lat))
-                mean_dpp = self.average_dpp(target_rup[iloc], pars[0], pars[1], pars[2])
-
-                cdpp[iloc] = dpp_target - mean_dpp
+            cdpp[iloc] = dpp_target - mean_dpp
         return cdpp
     def average_dpp(self, rrup, a, b, c):
         """
