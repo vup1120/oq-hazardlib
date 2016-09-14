@@ -90,6 +90,344 @@ class Rupture(object):
         self.surface_nodes = surface_nodes
         self.rupture_slip_direction = rupture_slip_direction
 
+    def get_dppvalue(self, site):
+        """
+        Get the directivity prediction value, DPP at
+        a given site as described in Spudich et al. (2013).
+
+        :param site:
+            :class:`~openquake.hazardlib.geo.point.Point` object
+            representing the location of the target site
+        :returns:
+            A float number, directivity prediction value (DPP).
+        """
+
+        origin = self.surface.get_resampled_top_edge()[0]
+        dpp_multi = []
+        index_patch = self.surface.hypocentre_patch_index(
+            self.hypocenter, self.surface.get_resampled_top_edge(),
+            self.surface.mesh.depths[0][0], self.surface.mesh.depths[-1][0],
+            self.surface.get_dip())
+        idx_nxtp = True
+        hypocenter = self.hypocenter
+
+        while idx_nxtp:
+
+            # E Plane Calculation
+            p0, p1, p2, p3 = self.surface.get_fault_patch_vertices(
+                self.surface.get_resampled_top_edge(),
+                self.surface.mesh.depths[0][0],
+                self.surface.mesh.depths[-1][0],
+                self.surface.get_dip(), index_patch=index_patch)
+
+            [normal, dist_to_plane] = get_plane_equation(
+                p0, p1, p2, origin)
+
+            pp = projection_pp(site, normal, dist_to_plane, origin)
+            pd, e, idx_nxtp = directp(
+                p0, p1, p2, p3, hypocenter, origin, pp)
+            pd_geo = origin.point_at(
+                (pd[0] ** 2 + pd[1] ** 2) ** 0.5, -pd[2],
+                numpy.degrees(math.atan2(pd[0], pd[1])))
+
+            # determine the lower bound of E path value
+            f1 = geodetic_distance(p0.longitude,
+                                   p0.latitude,
+                                   p1.longitude,
+                                   p1.latitude)
+            f2 = geodetic_distance(p2.longitude,
+                                   p2.latitude,
+                                   p3.longitude,
+                                   p3.latitude)
+
+            if f1 > f2:
+                f = f1
+            else:
+                f = f2
+
+            fs, rd, r_hyp = average_s_rad(site, hypocenter, origin,
+                                          pp, normal, dist_to_plane, e, p0,
+                                          p1, self.rupture_slip_direction)
+            cprime = isochone_ratio(e, rd, r_hyp)
+
+            dpp_exp = cprime * numpy.maximum(e, 0.1 * f) *\
+                numpy.maximum(fs, 0.2)
+            dpp_multi.append(dpp_exp)
+
+            # check if go through the next patch of the fault
+            index_patch = index_patch + 1
+
+            if (len(self.surface.get_resampled_top_edge())
+                <= 2) and (index_patch >=
+                           len(self.surface.get_resampled_top_edge())):
+
+                idx_nxtp = False
+            elif index_patch >= len(self.surface.get_resampled_top_edge()):
+                idx_nxtp = False
+            elif idx_nxtp:
+                hypocenter = pd_geo
+                idx_nxtp = True
+
+        # calculate DPP value of the site.
+        if numpy.sum(dpp_multi) > 0.:
+            dpp = numpy.log(numpy.sum(dpp_multi))
+        else:
+            dpp = numpy.log(0.8 * 0.1 * f * 0.2)
+        return dpp
+
+    def get_cdppvalue(self, target, buf=0.8, delta=0.5, space=5.):
+        """
+        Get the directivity prediction value, centred DPP(cdpp) at
+        a given site as described in Spudich et al. (2013), and this cdpp is
+        used in Chiou and Young(2014) GMPE for near-fault directivity
+        term prediction.
+
+        :param target_site:
+            A mesh object representing the location of the target sites.
+        :param buf:
+            A float value presents  the buffer distance in km to extend the
+            mesh borders to.
+        :param delta:
+            A float value presents the desired distance between two adjacent
+            points in mesh
+        :param space:
+            A float value presents the tolerance for the same distance of the
+            sites (default 2 km)
+        :returns:
+            A float value presents the centreed directivity predication value
+            which used in Chioud and Young(2014) GMPE for directivity term
+        """
+
+        min_lon, max_lon, max_lat, min_lat = self.surface.get_bounding_box()
+
+        min_lon -= buf
+        max_lon += buf
+        min_lat -= buf
+        max_lat += buf
+
+        lons = numpy.arange(min_lon, max_lon + delta, delta)
+        lats = numpy.arange(min_lat, max_lat + delta, delta)
+        lons, lats = numpy.meshgrid(lons, lats)
+
+        target_rup = self.surface.get_min_distance(target)
+        mesh = RectangularMesh(lons=lons, lats=lats, depths=None)
+        mesh_rup = self.surface.get_min_distance(mesh)
+
+        target_lons = target.lons
+        target_lats = target.lats
+        cdpp = numpy.empty(len(target_lons))
+
+        for iloc, (target_lon, target_lat) in enumerate(zip(target_lons,
+                                                            target_lats)):
+            if target_rup[iloc] <= 70.:
+                cdpp_sites_lats = mesh.lats[(mesh_rup <= target_rup[iloc] + space)
+                                            & (mesh_rup >= target_rup[iloc]
+                                               - space)]
+                cdpp_sites_lons = mesh.lons[(mesh_rup <= target_rup[iloc] + space)
+                                            & (mesh_rup >= target_rup[iloc]
+                                               - space)]
+
+                dpp_sum = []
+                dpp_target = self.get_dppvalue(Point(target_lon, target_lat))
+
+                for lon, lat in zip(cdpp_sites_lons, cdpp_sites_lats):
+                    site = Point(lon, lat, 0.)
+                    dpp_one = self.get_dppvalue(site)
+                    dpp_sum.append(dpp_one)
+
+                mean_dpp = numpy.mean(dpp_sum)
+                cdpp[iloc] = dpp_target - mean_dpp
+            else:
+                cdpp[iloc] = 0.
+
+        return cdpp
+
+    def get_predicted_cdppvalue(self, target, buf=0.4, delta=0.02):
+        """
+        Get the directivity prediction value, centred DPP(cdpp) at
+        a given site as described in Spudich et al. (2013), and this cdpp is
+        used in Chiou and Young(2014) GMPE for near-fault directivity
+        term prediction.
+
+        :param target_site:
+            A mesh object representing the location of the target sites.
+        :param buf:
+            A float value presents  the buffer distance in km to extend the
+            mesh borders to.
+        :param delta:
+            A float value presents the desired distance between two adjacent
+            points in mesh
+        :returns:
+            A float value presents the centreed directivity predication value
+            which used in Chioud and Young(2014) GMPE for directivity term
+        """
+
+        min_lon, max_lon, max_lat, min_lat = self.surface.get_bounding_box()
+
+        min_lon -= buf
+        max_lon += buf
+        min_lat -= buf
+        max_lat += buf
+
+        lons = numpy.arange(min_lon, max_lon + delta, delta)
+        lats = numpy.arange(min_lat, max_lat + delta, delta)
+        lons, lats = numpy.meshgrid(lons, lats)
+
+        target_rup = self.surface.get_min_distance(target)
+        mesh = RectangularMesh(lons=lons, lats=lats, depths=None)
+        mesh_rup = self.surface.get_min_distance(mesh)
+
+        target_lons = target.lons
+        target_lats = target.lats
+        cdpp = numpy.zeros(len(target_lons))
+
+        dpp = []
+        for i, (gridlon, gridlat) in enumerate(zip(mesh.lons.flatten(),mesh.lats.flatten())):
+
+            dpp.append(self.get_dppvalue(Point(gridlon, gridlat)))
+        rrup_tmp = mesh_rup.flatten()
+        initial = np.array([3.5, 0.5, 0.5])
+        pars, pcov = curve_fit(self.average_dpp, rrup_tmp, dpp, initial)
+        for iloc, (target_lon, target_lat) in enumerate(zip(target_lons,
+                                                            target_lats)):
+
+            dpp_sum = []
+            dpp_target = self.get_dppvalue(Point(target_lon, target_lat))
+            mean_dpp = self.average_dpp(target_rup[iloc], pars[0], pars[1], pars[2])
+
+            cdpp[iloc] = dpp_target - mean_dpp
+        return cdpp
+    def average_dpp(self, rrup, a, b, c):
+        """
+        Obtain the distance parameters needed to predict directivity for
+        strike-slip event defined by Somerville et al., 1997, page 205.
+
+        :param rrup:
+            An numpy array represents of clostest distance to the fault from the sites
+        :param a:
+            A coefficient obtained by data fitting
+        :param b:
+            A coefficient obtained by data fitting
+        :param c:
+            A coefficient obtained by data fitting
+
+        :returns:
+            A numpy array, represents of predicted average dpp values
+        """
+        ztor = self.surface.mesh.depths[0][0]
+        ztor = 0.
+        return a + (b / np.cosh(np.abs(c) * (rrup-ztor).clip(0, np.inf)))
+
+    def get_somerviller_rupture_parameters(self, target, output=1):
+        """
+        Obtain the distance parameters needed to predict directivity for
+        strike-slip event defined by Somerville et al., 1997, page 205.
+
+        :param target:
+            A mesh object representing the location of the target sites.
+        :param angle:
+            If ``True`` (by default), the rup_azimuth is calculated. If this
+            is set to ``False``, the rup_distance is calculated.
+        :param output:
+            1: s
+            2: theta
+            3: d
+            4: az
+        :returns:
+            s, a numpy array, represents the rupture fraction
+            distance to the target site for strike-slip
+            theta, a numpy array, represents the angle between the
+            rupture direction and the path to the site with respect to the
+            rupture (measured in degrees herein) for strike-slip
+            d, a numpy array, represents the rupture fraction
+            distance to the target site for dip-slip
+            az, a numpy array, represents the angle between the
+            rupture direction and the path to the site with respect to the
+            rupture (measured in degrees herein) for dip-slip
+        """
+
+        fd = 0.
+        for i in range(1, len(self.surface.get_resampled_top_edge())):
+            # Read the vertices of each segment
+            P0, P1, P2, P3 = self.surface.get_fault_patch_vertices(
+                self.surface.get_resampled_top_edge(),
+                self.surface.mesh.depths[0][0],
+                self.surface.mesh.depths[-1][0],
+                self.surface.get_dip(), index_patch=i)
+                    # Set up pseudo-hypocenter
+            phyp = setPseudoHypo(i, self.surface, self.hypocenter)
+            # Currently assuming that the rake is the same on all subfaults.
+            SlipCategory = getSlipCategory(self.rake)
+            T_Mw = Magnitude_taper(self.mag)
+            surf = PlanarSurface.from_corner_points(1., P0, P1, P2, P3)
+            Rrup = surf.get_min_distance(target)
+            Rx = surf.get_rx_distance(target)
+            Ry = surf.get_ry0_distance(target)
+            weight = surf.get_area() / self.surface.get_area()
+            L = distance(P0.longitude, P0.latitude, P0.depth,
+                         P1.longitude, P1.latitude, P1.depth)
+            W = surf.get_width()
+
+            d = computeD(phyp, P0, P1, P2, P3, target)
+            s, theta = computeThetaAndS(phyp, P0, P1, P2, P3, target)
+            az = computeAz(Rx, Ry)
+            if output == 1:
+                return s
+            elif output == 2:
+                return np.degrees(theta)
+            elif output == 3:
+                return d
+            elif output == 4:
+                return np.degrees(az)
+
+    def get_bayless2013fd(self, target, output=1):
+        """
+        Get the directivity prediction value, prediceted by Bayless and Somerville,
+        2013 at a given site
+
+        :param output:
+            1: f_geom_SS
+            2: tapering_SS * weight
+            3: f_geom_DS
+            4: tapering_DS * weight
+        """
+        fd = 0.
+        for i in range(1, len(self.surface.get_resampled_top_edge())):
+            # Read the vertices of each segment
+            P0, P1, P2, P3 = self.surface.get_fault_patch_vertices(
+                self.surface.get_resampled_top_edge(),
+                self.surface.mesh.depths[0][0],
+                self.surface.mesh.depths[-1][0],
+                self.surface.get_dip(), index_patch=i)
+                    # Set up pseudo-hypocenter
+            phyp = setPseudoHypo(i, self.surface, self.hypocenter)
+            # Currently assuming that the rake is the same on all subfaults.
+            SlipCategory = getSlipCategory(self.rake)
+            T_Mw = Magnitude_taper(self.mag)
+            surf = PlanarSurface.from_corner_points(1., P0, P1, P2, P3)
+            Rrup = surf.get_min_distance(target)
+            Rx = surf.get_rx_distance(target)
+            Ry = surf.get_ry0_distance(target)
+            weight = surf.get_area() / self.surface.get_area()
+            L = distance(P0.longitude, P0.latitude, P0.depth,
+                         P1.longitude, P1.latitude, P1.depth)
+            W = surf.get_width()
+
+            d = computeD(phyp, P0, P1, P2, P3, target)
+            s, theta = computeThetaAndS(phyp, P0, P1, P2, P3, target)
+            az = computeAz(Rx, Ry)
+            f_geom_SS, tapering_SS = computeSS(s, theta, target, L, T_Mw, Rrup)
+            f_geom_DS, tapering_DS = computeDS(d, az, T_Mw, Rx, Rrup, W, target)
+
+            if output == 1:
+                return f_geom_SS
+            elif output == 2:
+                return tapering_SS * weight
+            elif output == 3:
+                return f_geom_DS
+            elif output == 4:
+                return tapering_DS * weight
+
 
 class BaseProbabilisticRupture(with_metaclass(abc.ABCMeta, Rupture)):
     """
@@ -300,344 +638,3 @@ class ParametricProbabilisticRupture(BaseProbabilisticRupture):
         tom = self.temporal_occurrence_model
         rate = self.occurrence_rate
         return tom.get_probability_no_exceedance(rate, poes)
-
-    def get_dppvalue(self, site):
-        """
-        Get the directivity prediction value, DPP at
-        a given site as described in Spudich et al. (2013).
-
-        :param site:
-            :class:`~openquake.hazardlib.geo.point.Point` object
-            representing the location of the target site
-        :returns:
-            A float number, directivity prediction value (DPP).
-        """
-
-        origin = self.surface.get_resampled_top_edge()[0]
-        dpp_multi = []
-        index_patch = self.surface.hypocentre_patch_index(
-            self.hypocenter, self.surface.get_resampled_top_edge(),
-            self.surface.mesh.depths[0][0], self.surface.mesh.depths[-1][0],
-            self.surface.get_dip())
-        idx_nxtp = True
-        hypocenter = self.hypocenter
-
-        while idx_nxtp:
-
-            # E Plane Calculation
-            p0, p1, p2, p3 = self.surface.get_fault_patch_vertices(
-                self.surface.get_resampled_top_edge(),
-                self.surface.mesh.depths[0][0],
-                self.surface.mesh.depths[-1][0],
-                self.surface.get_dip(), index_patch=index_patch)
-
-            [normal, dist_to_plane] = get_plane_equation(
-                p0, p1, p2, origin)
-
-            pp = projection_pp(site, normal, dist_to_plane, origin)
-            pd, e, idx_nxtp = directp(
-                p0, p1, p2, p3, hypocenter, origin, pp)
-            pd_geo = origin.point_at(
-                (pd[0] ** 2 + pd[1] ** 2) ** 0.5, -pd[2],
-                numpy.degrees(math.atan2(pd[0], pd[1])))
-
-            # determine the lower bound of E path value
-            f1 = geodetic_distance(p0.longitude,
-                                   p0.latitude,
-                                   p1.longitude,
-                                   p1.latitude)
-            f2 = geodetic_distance(p2.longitude,
-                                   p2.latitude,
-                                   p3.longitude,
-                                   p3.latitude)
-
-            if f1 > f2:
-                f = f1
-            else:
-                f = f2
-
-            fs, rd, r_hyp = average_s_rad(site, hypocenter, origin,
-                                          pp, normal, dist_to_plane, e, p0,
-                                          p1, self.rupture_slip_direction)
-            cprime = isochone_ratio(e, rd, r_hyp)
-
-            dpp_exp = cprime * numpy.maximum(e, 0.1 * f) *\
-                numpy.maximum(fs, 0.2)
-            dpp_multi.append(dpp_exp)
-
-            # check if go through the next patch of the fault
-            index_patch = index_patch + 1
-
-            if (len(self.surface.get_resampled_top_edge())
-                <= 2) and (index_patch >=
-                           len(self.surface.get_resampled_top_edge())):
-
-                idx_nxtp = False
-            elif index_patch >= len(self.surface.get_resampled_top_edge()):
-                idx_nxtp = False
-            elif idx_nxtp:
-                hypocenter = pd_geo
-                idx_nxtp = True
-
-        # calculate DPP value of the site.
-        if numpy.sum(dpp_multi) > 0.:
-            dpp = numpy.log(numpy.sum(dpp_multi))
-        else:
-            dpp = numpy.log(0.8 * 0.1 * f * 0.2)
-        return dpp
-
-    def get_cdppvalue(self, target, buf=0.8, delta=0.5, space=5.):
-        """
-        Get the directivity prediction value, centred DPP(cdpp) at
-        a given site as described in Spudich et al. (2013), and this cdpp is
-        used in Chiou and Young(2014) GMPE for near-fault directivity
-        term prediction.
-
-        :param target_site:
-            A mesh object representing the location of the target sites.
-        :param buf:
-            A float value presents  the buffer distance in km to extend the
-            mesh borders to.
-        :param delta:
-            A float value presents the desired distance between two adjacent
-            points in mesh
-        :param space:
-            A float value presents the tolerance for the same distance of the
-            sites (default 2 km)
-        :returns:
-            A float value presents the centreed directivity predication value
-            which used in Chioud and Young(2014) GMPE for directivity term
-        """
-
-        min_lon, max_lon, max_lat, min_lat = self.surface.get_bounding_box()
-
-        min_lon -= buf
-        max_lon += buf
-        min_lat -= buf
-        max_lat += buf
-
-        lons = numpy.arange(min_lon, max_lon + delta, delta)
-        lats = numpy.arange(min_lat, max_lat + delta, delta)
-        lons, lats = numpy.meshgrid(lons, lats)
-
-        target_rup = self.surface.get_min_distance(target)
-        mesh = RectangularMesh(lons=lons, lats=lats, depths=None)
-        mesh_rup = self.surface.get_min_distance(mesh)
-
-        target_lons = target.lons
-        target_lats = target.lats
-        cdpp = numpy.empty(len(target_lons))
-
-        for iloc, (target_lon, target_lat) in enumerate(zip(target_lons,
-                                                            target_lats)):
-            if target_rup[iloc] <= 70.:
-                cdpp_sites_lats = mesh.lats[(mesh_rup <= target_rup[iloc] + space)
-                                            & (mesh_rup >= target_rup[iloc]
-                                               - space)]
-                cdpp_sites_lons = mesh.lons[(mesh_rup <= target_rup[iloc] + space)
-                                            & (mesh_rup >= target_rup[iloc]
-                                               - space)]
-
-                dpp_sum = []
-                dpp_target = self.get_dppvalue(Point(target_lon, target_lat))
-
-                for lon, lat in zip(cdpp_sites_lons, cdpp_sites_lats):
-                    site = Point(lon, lat, 0.)
-                    dpp_one = self.get_dppvalue(site)
-                    dpp_sum.append(dpp_one)
-
-                mean_dpp = numpy.mean(dpp_sum)
-                cdpp[iloc] = dpp_target - mean_dpp
-            else:
-                cdpp[iloc] = 0.
-
-        return cdpp
-
-    def get_predicted_cdppvalue(self, target, buf=0.4, delta=0.05, space=5.):
-        """
-        Get the directivity prediction value, centred DPP(cdpp) at
-        a given site as described in Spudich et al. (2013), and this cdpp is
-        used in Chiou and Young(2014) GMPE for near-fault directivity
-        term prediction.
-
-        :param target_site:
-            A mesh object representing the location of the target sites.
-        :param buf:
-            A float value presents  the buffer distance in km to extend the
-            mesh borders to.
-        :param delta:
-            A float value presents the desired distance between two adjacent
-            points in mesh
-        :param space:
-            A float value presents the tolerance for the same distance of the
-            sites (default 2 km)
-        :returns:
-            A float value presents the centreed directivity predication value
-            which used in Chioud and Young(2014) GMPE for directivity term
-        """
-
-        min_lon, max_lon, max_lat, min_lat = self.surface.get_bounding_box()
-
-        min_lon -= buf
-        max_lon += buf
-        min_lat -= buf
-        max_lat += buf
-
-        lons = numpy.arange(min_lon, max_lon + delta, delta)
-        lats = numpy.arange(min_lat, max_lat + delta, delta)
-        lons, lats = numpy.meshgrid(lons, lats)
-
-        target_rup = self.surface.get_min_distance(target)
-        mesh = RectangularMesh(lons=lons, lats=lats, depths=None)
-        mesh_rup = self.surface.get_min_distance(mesh)
-
-        target_lons = target.lons
-        target_lats = target.lats
-        cdpp = numpy.zeros(len(target_lons))
-
-        dpp = []
-        for i, (gridlon, gridlat) in enumerate(zip(mesh.lons.flatten(),mesh.lats.flatten())):
-
-            dpp.append(self.get_dppvalue(Point(gridlon, gridlat)))
-        rrup_tmp = mesh_rup.flatten()
-        initial = np.array([3.5, 0.5, 0.5])
-        pars, pcov = curve_fit(self.average_dpp, rrup_tmp, dpp, initial)
-        for iloc, (target_lon, target_lat) in enumerate(zip(target_lons,
-                                                            target_lats)):
-
-            dpp_sum = []
-            dpp_target = self.get_dppvalue(Point(target_lon, target_lat))
-            mean_dpp = self.average_dpp(target_rup[iloc], pars[0], pars[1], pars[2])
-
-            cdpp[iloc] = dpp_target - mean_dpp
-        return cdpp
-    def average_dpp(self, rrup, a, b, c):
-        """
-        Obtain the distance parameters needed to predict directivity for
-        strike-slip event defined by Somerville et al., 1997, page 205.
-
-        :param rrup:
-            An numpy array represents of clostest distance to the fault from the sites
-        :param a:
-            A coefficient obtained by data fitting
-        :param b:
-            A coefficient obtained by data fitting
-        :param c:
-            A coefficient obtained by data fitting
-
-        :returns:
-            A numpy array, represents of predicted average dpp values
-        """
-        ztor = self.surface.mesh.depths[0][0]
-        ztor = 0.
-        return a + (b / np.cosh(np.abs(c) * (rrup-ztor).clip(0, np.inf)))
-
-    def get_somerviller_rupture_parameters(self, target, output=1):
-        """
-        Obtain the distance parameters needed to predict directivity for
-        strike-slip event defined by Somerville et al., 1997, page 205.
-
-        :param target:
-            A mesh object representing the location of the target sites.
-        :param angle:
-            If ``True`` (by default), the rup_azimuth is calculated. If this
-            is set to ``False``, the rup_distance is calculated.
-        :param output:
-            1: s
-            2: theta
-            3: d
-            4: az
-        :returns:
-            s, a numpy array, represents the rupture fraction
-            distance to the target site for strike-slip
-            theta, a numpy array, represents the angle between the
-            rupture direction and the path to the site with respect to the
-            rupture (measured in degrees herein) for strike-slip
-            d, a numpy array, represents the rupture fraction
-            distance to the target site for dip-slip
-            az, a numpy array, represents the angle between the
-            rupture direction and the path to the site with respect to the
-            rupture (measured in degrees herein) for dip-slip
-        """
-
-        fd = 0.
-        for i in range(1, len(self.surface.get_resampled_top_edge())):
-            # Read the vertices of each segment
-            P0, P1, P2, P3 = self.surface.get_fault_patch_vertices(
-                self.surface.get_resampled_top_edge(),
-                self.surface.mesh.depths[0][0],
-                self.surface.mesh.depths[-1][0],
-                self.surface.get_dip(), index_patch=i)
-                    # Set up pseudo-hypocenter
-            phyp = setPseudoHypo(i, self.surface, self.hypocenter)
-            # Currently assuming that the rake is the same on all subfaults.
-            SlipCategory = getSlipCategory(self.rake)
-            T_Mw = Magnitude_taper(self.mag)
-            surf = PlanarSurface.from_corner_points(1., P0, P1, P2, P3)
-            Rrup = surf.get_min_distance(target)
-            Rx = surf.get_rx_distance(target)
-            Ry = surf.get_ry0_distance(target)
-            weight = surf.get_area() / self.surface.get_area()
-            L = distance(P0.longitude, P0.latitude, P0.depth,
-                         P1.longitude, P1.latitude, P1.depth)
-            W = surf.get_width()
-
-            d = computeD(phyp, P0, P1, P2, P3, target)
-            s, theta = computeThetaAndS(phyp, P0, P1, P2, P3, target)
-            az = computeAz(Rx, Ry)
-            if output == 1:
-                return s
-            elif output == 2:
-                return np.degrees(theta)
-            elif output == 3:
-                return d
-            elif output == 4:
-                return np.degrees(az)
-
-    def get_bayless2013fd(self, target, output=1):
-        """
-        Get the directivity prediction value, prediceted by Bayless and Somerville,
-        2013 at a given site
-
-        :param output:
-            1: f_geom_SS
-            2: tapering_SS * weight
-            3: f_geom_DS
-            4: tapering_DS * weight
-        """
-        fd = 0.
-        for i in range(1, len(self.surface.get_resampled_top_edge())):
-            # Read the vertices of each segment
-            P0, P1, P2, P3 = self.surface.get_fault_patch_vertices(
-                self.surface.get_resampled_top_edge(),
-                self.surface.mesh.depths[0][0],
-                self.surface.mesh.depths[-1][0],
-                self.surface.get_dip(), index_patch=i)
-                    # Set up pseudo-hypocenter
-            phyp = setPseudoHypo(i, self.surface, self.hypocenter)
-            # Currently assuming that the rake is the same on all subfaults.
-            SlipCategory = getSlipCategory(self.rake)
-            T_Mw = Magnitude_taper(self.mag)
-            surf = PlanarSurface.from_corner_points(1., P0, P1, P2, P3)
-            Rrup = surf.get_min_distance(target)
-            Rx = surf.get_rx_distance(target)
-            Ry = surf.get_ry0_distance(target)
-            weight = surf.get_area() / self.surface.get_area()
-            L = distance(P0.longitude, P0.latitude, P0.depth,
-                         P1.longitude, P1.latitude, P1.depth)
-            W = surf.get_width()
-
-            d = computeD(phyp, P0, P1, P2, P3, target)
-            s, theta = computeThetaAndS(phyp, P0, P1, P2, P3, target)
-            az = computeAz(Rx, Ry)
-            f_geom_SS, tapering_SS = computeSS(s, theta, target, L, T_Mw, Rrup)
-            f_geom_DS, tapering_DS = computeDS(d, az, T_Mw, Rx, Rrup, W, target)
-
-            if output == 1:
-                return f_geom_SS
-            elif output == 2:
-                return tapering_SS * weight
-            elif output == 3:
-                return f_geom_DS
-            elif output == 4:
-                return tapering_DS * weight
