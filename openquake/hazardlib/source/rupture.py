@@ -175,7 +175,7 @@ class Rupture(object):
             dpp = numpy.log(0.8 * 0.1 * f * 0.2)
         return dpp
 
-    def get_cdppvalue(self, target, buf=0.8, delta=0.5, space=5.):
+    def get_cdppvalue(self, target, buf=0.7, delta=0.5, space=5.):
         """
         Get the directivity prediction value, centred DPP(cdpp) at
         a given site as described in Spudich et al. (2013), and this cdpp is
