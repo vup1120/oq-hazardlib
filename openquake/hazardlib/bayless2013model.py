@@ -186,6 +186,7 @@ def computeDS(d, Az, T_Mw, Rx, Rrup, W, sites):
 
     # Geometric directivity predictor:
     RxoverW = (Rx / W).clip(min = -np.pi/2.0, max = 2.0*np.pi/3.0)
+    RxoverW = RxoverW.reshape(d.shape)
     f_geom = np.log(d) * np.cos(RxoverW)
     # Distance taper
     T_CD = np.ones_like(len(sites))

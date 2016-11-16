@@ -389,10 +389,8 @@ class ChiouYoungs2014NearFaultBayless(ChiouYoungs2014):
         mean, stddevs = super(ChiouYoungs2014NearFaultBayless, self).get_mean_and_stddevs(
             sites, rup, dists, imt, stddev_types)
 
-        fd_SS = (self.SCALING_FACTOR[imt]["C0_SS"] +
-                self.SCALING_FACTOR[imt]["C1_SS"] * dists.rgeomSS) * dists.rtaperSS
-        fd_DS = (self.SCALING_FACTOR[imt]["C0_DS"] +
-                self.SCALING_FACTOR[imt]["C1_DS"] * dists.rgeomDS) * dists.rtaperDS
+        fd_SS = self.SCALING_FACTOR[imt]["C0_SS"] * dists.rtaperSS + self.SCALING_FACTOR[imt]["C1_SS"] * dists.rgeomSS
+        fd_DS = self.SCALING_FACTOR[imt]["C0_DS"] * dists.rtaperDS + self.SCALING_FACTOR[imt]["C1_DS"] * dists.rgeomDS
 
         arake = np.abs(rup.rake)
         if ((arake >= 0) and (arake <= 30)) or ((arake >= 150) and (arake <= 180)):

@@ -35,6 +35,7 @@ from openquake.hazardlib.near_fault import (get_plane_equation, projection_pp,
 from openquake.baselib.python3compat import with_metaclass
 from scipy.optimize import curve_fit
 from openquake.hazardlib.bayless2013model import *
+from openquake.hazardlib.scalerel.wc1994 import WC1994
 
 
 @with_slots
@@ -392,6 +393,10 @@ class Rupture(object):
             4: tapering_DS * weight
         """
         fd = 0.
+        f_geom_SS_final = 0.
+        f_geom_DS_final = 0.
+        tapering_SS_final = 0.
+        tapering_DS_final = 0.
         for i in range(1, len(self.surface.get_resampled_top_edge())):
             # Read the vertices of each segment
             P0, P1, P2, P3 = self.surface.get_fault_patch_vertices(
@@ -402,13 +407,16 @@ class Rupture(object):
                     # Set up pseudo-hypocenter
             phyp = setPseudoHypo(i, self.surface, self.hypocenter)
             # Currently assuming that the rake is the same on all subfaults.
-            SlipCategory = getSlipCategory(self.rake)
-            T_Mw = Magnitude_taper(self.mag)
             surf = PlanarSurface.from_corner_points(1., P0, P1, P2, P3)
+            weight = surf.get_area() / self.surface.get_area()
+            asr = WC1994()
+            median_magnitude = asr.get_median_mag(surf.get_area(), self.rake)
+            SlipCategory = getSlipCategory(self.rake)
+            T_Mw = Magnitude_taper(median_magnitude)
             Rrup = surf.get_min_distance(target)
             Rx = surf.get_rx_distance(target)
             Ry = surf.get_ry0_distance(target)
-            weight = surf.get_area() / self.surface.get_area()
+
             L = distance(P0.longitude, P0.latitude, P0.depth,
                          P1.longitude, P1.latitude, P1.depth)
             W = surf.get_width()
@@ -418,15 +426,18 @@ class Rupture(object):
             az = computeAz(Rx, Ry)
             f_geom_SS, tapering_SS = computeSS(s, theta, target, L, T_Mw, Rrup)
             f_geom_DS, tapering_DS = computeDS(d, az, T_Mw, Rx, Rrup, W, target)
-
-            if output == 1:
-                return f_geom_SS
-            elif output == 2:
-                return tapering_SS * weight
-            elif output == 3:
-                return f_geom_DS
-            elif output == 4:
-                return tapering_DS * weight
+            tapering_SS_final = tapering_SS_final + tapering_SS * weight
+            tapering_DS_final = tapering_DS_final + tapering_DS * weight
+            f_geom_SS_final = f_geom_SS_final + f_geom_SS * tapering_SS * weight
+            f_geom_DS_final = f_geom_DS_final + f_geom_DS * tapering_DS * weight
+        if output == 1:
+            return f_geom_SS_final
+        elif output == 2:
+            return tapering_SS_final
+        elif output == 3:
+            return f_geom_DS_final
+        elif output == 4:
+            return tapering_DS_final
 
 
 class BaseProbabilisticRupture(with_metaclass(abc.ABCMeta, Rupture)):
