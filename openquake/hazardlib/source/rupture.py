@@ -186,7 +186,7 @@ class Rupture(object):
         :param target_site:
             A mesh object representing the location of the target sites.
         :param buf:
-            A float value presents  the buffer distance in km to extend the
+            A float value presents the buffer distance in km to extend the
             mesh borders to.
         :param delta:
             A float value presents the desired distance between two adjacent
@@ -356,7 +356,9 @@ class Rupture(object):
                 self.surface.mesh.depths[-1][0],
                 self.surface.get_dip(), index_patch=i)
                     # Set up pseudo-hypocenter
-            phyp = setPseudoHypo(i, self.surface, self.hypocenter)
+            surf = PlanarSurface.from_corner_points(1., P0, P1, P2, P3)
+
+            phyp = setPseudoHypo(i, self.surface, surf, self.hypocenter)
             # Currently assuming that the rake is the same on all subfaults.
             SlipCategory = getSlipCategory(self.rake)
             T_Mw = Magnitude_taper(self.mag)
@@ -405,9 +407,10 @@ class Rupture(object):
                 self.surface.mesh.depths[-1][0],
                 self.surface.get_dip(), index_patch=i)
                     # Set up pseudo-hypocenter
-            phyp = setPseudoHypo(i, self.surface, self.hypocenter)
             # Currently assuming that the rake is the same on all subfaults.
             surf = PlanarSurface.from_corner_points(1., P0, P1, P2, P3)
+
+            phyp = setPseudoHypo(i, self.surface, surf, self.hypocenter)
             weight = surf.get_area() / self.surface.get_area()
             asr = WC1994()
             median_magnitude = asr.get_median_mag(surf.get_area(), self.rake)
@@ -426,8 +429,6 @@ class Rupture(object):
             az = computeAz(Rx, Ry)
             f_geom_SS, tapering_SS = computeSS(s, theta, target, L, T_Mw, Rrup)
             f_geom_DS, tapering_DS = computeDS(d, az, T_Mw, Rx, Rrup, W, target)
-            tapering_SS_final = tapering_SS_final + tapering_SS * weight
-            tapering_DS_final = tapering_DS_final + tapering_DS * weight
             f_geom_SS_final = f_geom_SS_final + f_geom_SS * tapering_SS * weight
             f_geom_DS_final = f_geom_DS_final + f_geom_DS * tapering_DS * weight
         if output == 1:

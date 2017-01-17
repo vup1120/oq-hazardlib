@@ -389,14 +389,11 @@ class ChiouYoungs2014NearFaultBayless(ChiouYoungs2014):
         mean, stddevs = super(ChiouYoungs2014NearFaultBayless, self).get_mean_and_stddevs(
             sites, rup, dists, imt, stddev_types)
 
-        fd_SS = self.SCALING_FACTOR[imt]["C0_SS"] * dists.rtaperSS + self.SCALING_FACTOR[imt]["C1_SS"] * dists.rgeomSS
-        fd_DS = self.SCALING_FACTOR[imt]["C0_DS"] * dists.rtaperDS + self.SCALING_FACTOR[imt]["C1_DS"] * dists.rgeomDS
-
         arake = np.abs(rup.rake)
         if ((arake >= 0) and (arake <= 30)) or ((arake >= 150) and (arake <= 180)):
-            corrector = fd_SS
+            corrector = self.SCALING_FACTOR[imt]["C0_SS"] + self.SCALING_FACTOR[imt]["C1_SS"] * dists.rgeomSS
         elif (arake >= 60) and (arake <= 120):
-            corrector = fd_DS
+            corrector = self.SCALING_FACTOR[imt]["C0_DS"] + self.SCALING_FACTOR[imt]["C1_DS"] * dists.rgeomDS
         else:
             sintheta = np.abs(np.sin(np.radians(rup.rake)))
             costheta = np.abs(np.cos(np.radians(rup.rake)))
@@ -405,5 +402,8 @@ class ChiouYoungs2014NearFaultBayless(ChiouYoungs2014):
             # Compute weights
             DipWeight = refrake / (np.pi / 2.0)
             StrikeWeight = 1.0 - DipWeight
-            corrector = StrikeWeight * fd_SS + DipWeight * fd_DS
+            corrector = StrikeWeight * self.SCALING_FACTOR[imt]["C0_SS"] + \
+                        StrikeWeight * self.SCALING_FACTOR[imt]["C1_SS"] * dists.rgeomSS + \
+                        DipWeight * self.SCALING_FACTOR[imt]["C0_DS"] + \
+                        DipWeight * self.SCALING_FACTOR[imt]["C1_DS"] * dists.rgeomDS
         return mean + corrector, stddevs + np.array(self.SIGMARUDCTION_FACTOR[imt]["TAU_R"])

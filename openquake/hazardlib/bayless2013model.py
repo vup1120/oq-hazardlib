@@ -19,7 +19,7 @@ from openquake.hazardlib.geo.surface.planar import PlanarSurface
 import pyprind
 
 
-def setPseudoHypo(i, surface, hypo):
+def setPseudoHypo(i, surface, sub_surface, hypo):
     """
     Adapted from ShakeMap 3.5 src/contour/directivity.c 
     From Bayless and Somerville:
@@ -38,17 +38,17 @@ def setPseudoHypo(i, surface, hypo):
     if i == index_patch:
         phyp = hypo
     elif i < index_patch:
-        row = np.round(len(surface.mesh.depths[:,0])/2)
-        tmp, col = surface.get_resampled_top_edge(return_top_edge_index=True)
-        phyp = Point(surface.mesh.lons[row][col[i+1]],
-                     surface.mesh.lats[row][col[i+1]],
-                     surface.mesh.depths[row][col[i+1]])
+        mesh = sub_surface.get_mesh()
+        row = np.round(len(mesh.depths[:,0])/2)
+        phyp = Point(mesh.lons[row][-1],
+                     mesh.lats[row][-1],
+                     mesh.depths[row][-1])
     elif i > index_patch:
-        row = np.round(len(surface.mesh.depths[:,0])/2)
-        tmp, col = surface.get_resampled_top_edge(return_top_edge_index=True)
-        phyp = Point(surface.mesh.lons[row][col[i]],
-                     surface.mesh.lats[row][col[i]],
-                     surface.mesh.depths[row][col[i]])
+        mesh = sub_surface.get_mesh()
+        row = np.round(len(mesh.depths[:,0])/2)
+        phyp = Point(mesh.lons[row][0],
+                     mesh.lats[row][0],
+                     mesh.depths[row][0])
     return phyp
 
 def computeThetaAndS(phyp, P0, P1, P2, P3, sites):
