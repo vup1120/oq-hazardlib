@@ -74,6 +74,7 @@ class Site(object):
         self.z1pt0 = z1pt0
         self.z2pt5 = z2pt5
         self.backarc = backarc
+        "This is an useless comment"
 
     def __str__(self):
         """
